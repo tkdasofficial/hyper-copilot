@@ -246,3 +246,75 @@ export function computeNextDueAt(schedule: ScheduleShape, from: Date = new Date(
   }
   return null;
 }
+
+/* -------------------------------------------------------------------------
+ * Caption builder
+ *
+ * Every published post carries a one-line hook plus a small set of niche
+ * hashtags, separated by a blank line. Values come from the workflow record
+ * (hook_title / hashtags); anything missing falls back to the workflow's own
+ * caption, name and category so a publish request never goes out without text.
+ * ---------------------------------------------------------------------- */
+
+const NICHE_HASHTAGS: Record<string, string[]> = {
+  "Cosmic Universe": ["#cosmos", "#universe", "#space", "#astronomy", "#nebula"],
+  "Nature Beauty": ["#nature", "#wildlife", "#naturelovers", "#earth", "#landscape"],
+  "Ocean & Sky": ["#ocean", "#sky", "#seascape", "#clouds", "#bluehour"],
+  "Micro World": ["#macro", "#microworld", "#macrophotography", "#tinyworld", "#details"],
+};
+
+const FALLBACK_HOOK = "A moment worth watching.";
+const FALLBACK_HASHTAGS = ["#cosmos", "#nature", "#universe", "#explore", "#reels"];
+
+/** Normalises loose input into `#tag` form and drops duplicates/blanks. */
+function normalizeHashtags(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === "string"
+      ? input.split(/[\s,]+/)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const tag = item.trim().replace(/^#+/, "").replace(/[^\p{L}\p{N}_]/gu, "");
+    if (!tag) continue;
+    const key = `#${tag}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(`#${tag}`);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+/** Trims any text down to a single punchy line. */
+function oneLine(text: string | null | undefined): string {
+  const first = (text ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
+  return first.length > 120 ? `${first.slice(0, 117).trimEnd()}…` : first;
+}
+
+export type CaptionSource = {
+  hookTitle?: string | null;
+  hashtags?: unknown;
+  caption?: string | null;
+  name?: string | null;
+  category?: string | null;
+};
+
+/**
+ * Builds the `caption` string sent to Meta's container-creation step:
+ * `hook\n\n#tag #tag #tag …` — always non-empty.
+ */
+export function buildPublishCaption(source: CaptionSource): string {
+  const hook =
+    oneLine(source.hookTitle) || oneLine(source.caption) || oneLine(source.name) || FALLBACK_HOOK;
+
+  let tags = normalizeHashtags(source.hashtags);
+  if (tags.length < 4) {
+    const niche = NICHE_HASHTAGS[source.category ?? ""] ?? FALLBACK_HASHTAGS;
+    tags = normalizeHashtags([...tags, ...niche, ...FALLBACK_HASHTAGS]);
+  }
+
+  return `${hook}\n\n${tags.join(" ")}`.trim();
+}
