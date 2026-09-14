@@ -12,3 +12,6 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /api/
+
+Sitemap: https://hypercopilot.vercel.app/sitemap.xml

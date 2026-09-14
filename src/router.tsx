@@ -9,7 +9,14 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreloadStaleTime: 0,
+    // Preload route code + data as soon as the user hovers/touches a link
+    defaultPreload: "intent",
+    defaultPreloadDelay: 0,
+    defaultPreloadStaleTime: 30_000,
+    // Keep the current page on screen while the next one loads instead of
+    // flashing an empty shell under the header.
+    defaultPendingMs: 1_500,
+    defaultPendingMinMs: 0,
   });
 
   return router;

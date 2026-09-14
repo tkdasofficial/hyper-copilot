@@ -7,10 +7,11 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
+import { ThemeProvider } from "../components/hyper/ThemeProvider";
+import { Toaster } from "../components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -37,9 +38,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -77,23 +75,119 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Hyper Copilot — Multi-Modal AI Generator" },
+      {
+        name: "description",
+        content:
+          "Built by Tushar Kanti Das, Hyper Copilot is an all-in-one multi-modal AI platform for image, video, audio, and AI influencer creation.",
+      },
+      { name: "robots", content: "index, follow" },
+      {
+        name: "googlebot",
+        content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+      },
+      { name: "author", content: "Tushar Kanti Das" },
+      { name: "creator", content: "Tushar Kanti Das" },
+      { name: "publisher", content: "Tushar Kanti Das" },
+      { name: "theme-color", content: "#111111" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Hyper Copilot" },
+      // Open Graph Tags
+      { property: "og:site_name", content: "Hyper Copilot" },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:title", content: "Hyper Copilot — Multi-Modal AI Generator" },
+      {
+        property: "og:description",
+        content:
+          "Built by Tushar Kanti Das, Hyper Copilot is an all-in-one multi-modal AI platform for image, video, audio, and AI influencer creation.",
+      },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://hypercopilot.vercel.app/" },
+      // Twitter Card Meta Tags
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Hyper Copilot — Multi-Modal AI Generator" },
+      {
+        name: "twitter:description",
+        content:
+          "Built by Tushar Kanti Das, Hyper Copilot is an all-in-one multi-modal AI platform for image, video, audio, and AI influencer creation.",
+      },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap",
+      },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "manifest", href: "/manifest.json" },
+    ],
+    scripts: [
+      // Schema.org Structured Data
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebSite",
+              "@id": "https://hypercopilot.vercel.app/#website",
+              name: "Hyper Copilot",
+              alternateName: "Hyper Copilot AI",
+              url: "https://hypercopilot.vercel.app/",
+              inLanguage: "en",
+              description:
+                "Built by Tushar Kanti Das, Hyper Copilot is an all-in-one multi-modal AI platform for image, video, audio, and AI influencer creation.",
+              publisher: {
+                "@type": "Person",
+                name: "Tushar Kanti Das",
+                url: "https://hypercopilot.vercel.app/",
+              },
+            },
+            {
+              "@type": "SoftwareApplication",
+              "@id": "https://hypercopilot.vercel.app/#app",
+              name: "Hyper Copilot",
+              alternateName: "Hyper Copilot AI",
+              url: "https://hypercopilot.vercel.app/",
+              applicationCategory: "MultimediaApplication",
+              operatingSystem: "All",
+              browserRequirements: "Requires a modern web browser with JavaScript enabled.",
+              image: "https://hypercopilot.vercel.app/og-image.png",
+              screenshot: "https://hypercopilot.vercel.app/og-image.png",
+              description:
+                "Built by Tushar Kanti Das, Hyper Copilot is an all-in-one multi-modal AI platform for image, video, audio, and AI influencer creation.",
+              featureList: [
+                "Text to image generation",
+                "Text to video generation",
+                "AI influencer and virtual model creation",
+                "Voice and audio generation",
+                "Vector and 3D drafts",
+                "Generative fill and 8K upscaling",
+              ],
+              creator: { "@type": "Person", name: "Tushar Kanti Das" },
+              author: { "@type": "Person", name: "Tushar Kanti Das" },
+              publisher: {
+                "@type": "Person",
+                name: "Tushar Kanti Das",
+                url: "https://hypercopilot.vercel.app/",
+              },
+              isPartOf: { "@id": "https://hypercopilot.vercel.app/#website" },
+            },
+          ],
+        }),
+      },
     ],
   }),
+
+
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -119,8 +213,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <ThemeProvider>
+        <Outlet />
+        <Toaster />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
