@@ -32,6 +32,8 @@ import { Route as AuthenticatedWorkflowsIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedWorkflowsCreateRouteImport } from './routes/_authenticated/workflows.create'
 import { Route as OauthMetaReturnRouteImport } from './routes/oauth/meta/return'
 import { Route as ApiPublicJobsWorkerRouteImport } from './routes/api/public/jobs/worker'
+import { Route as ApiPublicPipelineRenderRouteImport } from './routes/api/public/pipeline/render'
+import { Route as ApiPublicPipelineTickRouteImport } from './routes/api/public/pipeline/tick'
 import { Route as ApiPublicWorkflowsSchedulerRouteImport } from './routes/api/public/workflows/scheduler'
 
 const IndexRoute = IndexRouteImport.update({
@@ -152,6 +154,16 @@ const ApiPublicJobsWorkerRoute = ApiPublicJobsWorkerRouteImport.update({
   path: '/api/public/jobs/worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPipelineRenderRoute = ApiPublicPipelineRenderRouteImport.update({
+  id: '/api/public/pipeline/render',
+  path: '/api/public/pipeline/render',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPipelineTickRoute = ApiPublicPipelineTickRouteImport.update({
+  id: '/api/public/pipeline/tick',
+  path: '/api/public/pipeline/tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWorkflowsSchedulerRoute =
   ApiPublicWorkflowsSchedulerRouteImport.update({
     id: '/api/public/workflows/scheduler',
@@ -182,6 +194,8 @@ export interface FileRoutesByFullPath {
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/workflows/': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/pipeline/render': typeof ApiPublicPipelineRenderRoute
+  '/api/public/pipeline/tick': typeof ApiPublicPipelineTickRoute
   '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRoutesByTo {
@@ -207,6 +221,8 @@ export interface FileRoutesByTo {
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/workflows': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/pipeline/render': typeof ApiPublicPipelineRenderRoute
+  '/api/public/pipeline/tick': typeof ApiPublicPipelineTickRoute
   '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRoutesById {
@@ -234,6 +250,8 @@ export interface FileRoutesById {
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/_authenticated/workflows/': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/pipeline/render': typeof ApiPublicPipelineRenderRoute
+  '/api/public/pipeline/tick': typeof ApiPublicPipelineTickRoute
   '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRouteTypes {
@@ -261,6 +279,8 @@ export interface FileRouteTypes {
     | '/oauth/meta/return'
     | '/workflows/'
     | '/api/public/jobs/worker'
+    | '/api/public/pipeline/render'
+    | '/api/public/pipeline/tick'
     | '/api/public/workflows/scheduler'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -286,6 +306,8 @@ export interface FileRouteTypes {
     | '/oauth/meta/return'
     | '/workflows'
     | '/api/public/jobs/worker'
+    | '/api/public/pipeline/render'
+    | '/api/public/pipeline/tick'
     | '/api/public/workflows/scheduler'
   id:
     | '__root__'
@@ -312,6 +334,8 @@ export interface FileRouteTypes {
     | '/oauth/meta/return'
     | '/_authenticated/workflows/'
     | '/api/public/jobs/worker'
+    | '/api/public/pipeline/render'
+    | '/api/public/pipeline/tick'
     | '/api/public/workflows/scheduler'
   fileRoutesById: FileRoutesById
 }
@@ -334,6 +358,8 @@ export interface RootRouteChildren {
   VirtualModelIndexRoute: typeof VirtualModelIndexRoute
   OauthMetaReturnRoute: typeof OauthMetaReturnRoute
   ApiPublicJobsWorkerRoute: typeof ApiPublicJobsWorkerRoute
+  ApiPublicPipelineRenderRoute: typeof ApiPublicPipelineRenderRoute
+  ApiPublicPipelineTickRoute: typeof ApiPublicPipelineTickRoute
   ApiPublicWorkflowsSchedulerRoute: typeof ApiPublicWorkflowsSchedulerRoute
 }
 
@@ -500,6 +526,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicJobsWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/pipeline/render': {
+      id: '/api/public/pipeline/render'
+      path: '/api/public/pipeline/render'
+      fullPath: '/api/public/pipeline/render'
+      preLoaderRoute: typeof ApiPublicPipelineRenderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pipeline/tick': {
+      id: '/api/public/pipeline/tick'
+      path: '/api/public/pipeline/tick'
+      fullPath: '/api/public/pipeline/tick'
+      preLoaderRoute: typeof ApiPublicPipelineTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/workflows/scheduler': {
       id: '/api/public/workflows/scheduler'
       path: '/api/public/workflows/scheduler'
@@ -548,6 +588,8 @@ const rootRouteChildren: RootRouteChildren = {
   VirtualModelIndexRoute: VirtualModelIndexRoute,
   OauthMetaReturnRoute: OauthMetaReturnRoute,
   ApiPublicJobsWorkerRoute: ApiPublicJobsWorkerRoute,
+  ApiPublicPipelineRenderRoute: ApiPublicPipelineRenderRoute,
+  ApiPublicPipelineTickRoute: ApiPublicPipelineTickRoute,
   ApiPublicWorkflowsSchedulerRoute: ApiPublicWorkflowsSchedulerRoute,
 }
 export const routeTree = rootRouteImport

@@ -50,6 +50,7 @@ function activityOf(workflow: {
   triggerType: string;
   enabled: boolean;
 }): string {
+  if (workflow.runState === "requested") return "Starting…";
   if (workflow.runState === "rendering") return "Creating the video…";
   if (workflow.runState === "retry") return "Publishing failed — retrying";
   if (workflow.lastRunStatus === "completed") return "Last run published";
@@ -188,11 +189,8 @@ function WorkflowsPage() {
                         onClick={async () => {
                           setRunningId(workflow.id);
                           try {
-                            const res = await run({ data: { id: workflow.id } });
-                            if (res.status === "queued") toast.success("Video generation started");
-                            else toast[res.status === "completed" ? "success" : "error"](
-                              res.status === "completed" ? "Published" : "Run failed",
-                            );
+                            await run({ data: { id: workflow.id } });
+                            toast.success("Run started — it will publish in the background");
                             refresh();
                           } catch (err) {
                             toast.error(err instanceof Error ? err.message : "Run failed");

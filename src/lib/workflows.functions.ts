@@ -205,139 +205,47 @@ export const deleteWorkflow = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** Runs a workflow immediately, publishing to every selected account. */
+/**
+ * Asks for a workflow to run now.
+ *
+ * This only flags the row; the `workflows_dispatch_scheduler` database trigger
+ * wakes the server-side scheduler, which creates the video (if needed), waits
+ * for the render and publishes to every selected account — all without this
+ * request or the browser staying around. Progress shows up in `workflow_runs`.
+ */
 export const runWorkflowNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
     const { data: wf, error } = await context.supabase
       .from("workflows")
-      .select(SELECT)
+      .select("id, run_state")
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!wf) throw new Error("Workflow not found.");
-
-    const workflow = toWorkflow(wf as unknown as Row);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { publishTo, storedAsset, buildPublishCaption } = await import("@/lib/workflows.server");
-
-    if (isVideoAction(workflow.actionType)) {
-      const now = new Date().toISOString();
-      const { createVideoRender } = await import("@/lib/video-agent.server");
-      const creation = workflow.creationConfig;
-      const videoId = await createVideoRender(supabaseAdmin, context.userId, {
-        prompt: [workflow.caption || workflow.name, creation.category, creation.artStyle]
-          .filter(Boolean)
-          .join(". "),
-        negative_prompt: [
-          creation.instructions,
-          "human, person, face, character, crowd, watermark, text",
-        ].filter(Boolean).join(", "),
-        voice_gender: creation.voiceGender.toLowerCase(),
-        voice_persona: creation.voicePersona,
-        voice_speed: 110,
-        voice_pitch: 52,
-        image_style: `${creation.imageStyle} · ${creation.artStyle}`,
-        motion_template: "Auto Zoom-In",
-        captions: creation.captions,
-        caption_style: creation.captionStyle,
-        aspect_ratio: creation.aspectRatio,
-        quality: creation.quality,
-        bitrate: "High",
-        duration_seconds: creation.durationSeconds,
-      });
-      const { error: queueError } = await supabaseAdmin
-        .from("workflows")
-        .update({
-          enabled: true,
-          next_due_at: now,
-          run_state: "rendering",
-          pending_video_id: videoId,
-          publish_attempts: 0,
-          lock_until: null,
-          last_run_at: now,
-          last_run_status: "processing",
-        })
-        .eq("id", workflow.id)
-        .eq("user_id", context.userId);
-      if (queueError) throw new Error(queueError.message);
-      return { status: "queued" as const, results: [] };
+    if (wf.run_state && wf.run_state !== "idle") {
+      throw new Error("This workflow is already running.");
     }
 
-    const { data: targets } = await supabaseAdmin
-      .from("social_connections")
-      .select("id, provider, external_id, display_name, access_token, metadata")
-      .eq("user_id", context.userId)
-      .in("id", workflow.targets);
-
-    const results: { account: string; ok: boolean; detail: string }[] = [];
-
-    for (const target of (targets ?? []) as unknown as Parameters<typeof publishTo>[0][]) {
-      try {
-        const postId = await publishTo(
-          target,
-          workflow.actionType,
-          buildPublishCaption({
-            hookTitle: workflow.hookTitle,
-            hashtags: workflow.hashtags,
-            caption: workflow.caption,
-            name: workflow.name,
-            category: workflow.creationConfig.category,
-          }),
-          workflow.mediaUrl ?? "",
-        );
-        results.push({
-          account: target.display_name ?? target.provider,
-          ok: true,
-          detail: `Published (${postId})`,
-        });
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : "Unknown error";
-        console.error(`[workflow ${workflow.id}] publish failed`, detail);
-        results.push({ account: target.display_name ?? target.provider, ok: false, detail });
-      }
-    }
-
-    const failed = results.filter((r) => !r.ok);
-    const status = results.length === 0 ? "failed" : failed.length ? "failed" : "completed";
-
-    // Free storage guard: only when every target confirmed the post do we drop
-    // the stored asset (and its library record).
-    let cleanup = "";
-    if (status === "completed") {
-      const asset = storedAsset(workflow.mediaPath, workflow.mediaUrl);
-      if (asset) {
-        try {
-          await supabaseAdmin.storage.from(asset.bucket).remove([asset.path]);
-          await supabaseAdmin
-            .from("generations")
-            .delete()
-            .eq("user_id", context.userId)
-            .eq("storage_path", asset.path);
-          await supabaseAdmin
-            .from("workflows")
-            .update({ media_path: null, media_url: null })
-            .eq("id", workflow.id);
-          cleanup = " · media cleared from storage";
-        } catch (err) {
-          console.error(`[workflow ${workflow.id}] cleanup failed`, err);
-        }
-      }
-    }
-
-    await supabaseAdmin.from("workflow_runs").insert({
-      workflow_id: workflow.id,
-      user_id: context.userId,
-      status,
-      detail:
-        (results.map((r) => `${r.account}: ${r.detail}`).join(" · ") || "No accounts resolved") +
-        cleanup,
-    });
-    await supabaseAdmin
+    const now = new Date().toISOString();
+    const { data: updated, error: updateError } = await context.supabase
       .from("workflows")
-      .update({ last_run_at: new Date().toISOString(), last_run_status: status })
-      .eq("id", workflow.id);
+      .update({
+        run_state: "requested",
+        next_due_at: now,
+        pending_video_id: null,
+        publish_attempts: 0,
+        lock_until: null,
+        last_run_at: now,
+        last_run_status: "processing",
+      })
+      .eq("id", data.id)
+      .eq("run_state", wf.run_state ?? "idle")
+      .select("id")
+      .maybeSingle();
+    if (updateError) throw new Error(updateError.message);
+    if (!updated) throw new Error("This workflow is already running.");
 
-    return { status, results };
+    return { status: "queued" as const };
   });
