@@ -36,6 +36,8 @@ type WorkflowRow = {
   action_type: string;
   trigger_type: string;
   caption: string | null;
+  hook_title: string | null;
+  hashtags: string[] | null;
   media_url: string | null;
   media_path: string | null;
   targets: string[] | null;
@@ -50,13 +52,13 @@ type WorkflowRow = {
 };
 
 const SELECT =
-  "id, user_id, name, action_type, trigger_type, caption, media_url, media_path, targets, repeat_rule, time_slots, scheduled_at, tz_offset, creation_config, run_state, pending_video_id, publish_attempts";
+  "id, user_id, name, action_type, trigger_type, caption, hook_title, hashtags, media_url, media_path, targets, repeat_rule, time_slots, scheduled_at, tz_offset, creation_config, run_state, pending_video_id, publish_attempts";
 
 async function handle(request: Request) {
   if (!(await authorize(request))) return json({ error: "Unauthorized" }, 401);
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { publishTo, storedAsset, computeNextDueAt, normalizeCreationConfig } = await import(
+  const { publishTo, storedAsset, computeNextDueAt, normalizeCreationConfig, buildPublishCaption } = await import(
     "@/lib/workflows.server"
   );
   const { isVideoAction } = await import("@/lib/social.shared");
@@ -213,7 +215,13 @@ async function handle(request: Request) {
             (isVideo && raw.action_type === "publish_post"
               ? "publish_reel"
               : raw.action_type) as Parameters<typeof publishTo>[1],
-            raw.caption ?? creation.instructions ?? "",
+            buildPublishCaption({
+              hookTitle: raw.hook_title,
+              hashtags: raw.hashtags,
+              caption: raw.caption || creation.instructions,
+              name: raw.name,
+              category: creation.category,
+            }),
             mediaUrl,
           );
           results.push({

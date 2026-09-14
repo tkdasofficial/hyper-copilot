@@ -493,6 +493,8 @@ export type Database = {
           created_at: string
           creation_config: Json
           enabled: boolean
+          hashtags: string[]
+          hook_title: string | null
           id: string
           last_run_at: string | null
           last_run_status: string | null
@@ -519,6 +521,8 @@ export type Database = {
           created_at?: string
           creation_config?: Json
           enabled?: boolean
+          hashtags?: string[]
+          hook_title?: string | null
           id?: string
           last_run_at?: string | null
           last_run_status?: string | null
@@ -545,6 +549,8 @@ export type Database = {
           created_at?: string
           creation_config?: Json
           enabled?: boolean
+          hashtags?: string[]
+          hook_title?: string | null
           id?: string
           last_run_at?: string | null
           last_run_status?: string | null

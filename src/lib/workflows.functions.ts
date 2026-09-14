@@ -20,6 +20,8 @@ type Row = {
   time_slots: string[] | null;
   action_type: string;
   caption: string | null;
+  hook_title: string | null;
+  hashtags: string[] | null;
   media_url: string | null;
   media_path: string | null;
   targets: string[] | null;
@@ -48,6 +50,8 @@ function toWorkflow(row: Row): Workflow {
     timeSlots: row.time_slots ?? [],
     actionType: row.action_type as ActionType,
     caption: row.caption,
+    hookTitle: row.hook_title,
+    hashtags: row.hashtags ?? [],
     mediaUrl: row.media_url,
     mediaPath: row.media_path,
     targets: row.targets ?? [],
@@ -61,7 +65,7 @@ function toWorkflow(row: Row): Workflow {
 }
 
 const SELECT =
-  "id, name, enabled, trigger_type, scheduled_at, repeat_rule, time_slots, action_type, caption, media_url, media_path, targets, last_run_at, last_run_status, creation_config, tz_offset, next_due_at, run_state";
+  "id, name, enabled, trigger_type, scheduled_at, repeat_rule, time_slots, action_type, caption, hook_title, hashtags, media_url, media_path, targets, last_run_at, last_run_status, creation_config, tz_offset, next_due_at, run_state";
 
 export const listWorkflows = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -216,7 +220,7 @@ export const runWorkflowNow = createServerFn({ method: "POST" })
 
     const workflow = toWorkflow(wf as unknown as Row);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { publishTo, storedAsset } = await import("@/lib/workflows.server");
+    const { publishTo, storedAsset, buildPublishCaption } = await import("@/lib/workflows.server");
 
     if (isVideoAction(workflow.actionType)) {
       const now = new Date().toISOString();
@@ -274,7 +278,13 @@ export const runWorkflowNow = createServerFn({ method: "POST" })
         const postId = await publishTo(
           target,
           workflow.actionType,
-          workflow.caption ?? "",
+          buildPublishCaption({
+            hookTitle: workflow.hookTitle,
+            hashtags: workflow.hashtags,
+            caption: workflow.caption,
+            name: workflow.name,
+            category: workflow.creationConfig.category,
+          }),
           workflow.mediaUrl ?? "",
         );
         results.push({
