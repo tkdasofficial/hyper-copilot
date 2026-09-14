@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   defaultCreationConfig,
-  isVideoAction,
   type ActionType,
   type CreationConfig,
   type RepeatRule,
