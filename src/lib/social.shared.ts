@@ -176,6 +176,8 @@ export type Workflow = {
   timeSlots: string[];
   actionType: ActionType;
   caption: string | null;
+  hookTitle: string | null;
+  hashtags: string[];
   mediaUrl: string | null;
   mediaPath: string | null;
   targets: string[];
