@@ -69,6 +69,7 @@ export type Database = {
       }
       job_runner: {
         Row: {
+          app_base_url: string | null
           id: string
           lock_until: string | null
           paused: boolean
@@ -78,6 +79,7 @@ export type Database = {
           worker_token: string | null
         }
         Insert: {
+          app_base_url?: string | null
           id: string
           lock_until?: string | null
           paused?: boolean
@@ -87,6 +89,7 @@ export type Database = {
           worker_token?: string | null
         }
         Update: {
+          app_base_url?: string | null
           id?: string
           lock_until?: string | null
           paused?: boolean
@@ -607,6 +610,10 @@ export type Database = {
       }
       email_exists: { Args: { check_email: string }; Returns: boolean }
       get_provider_secret: { Args: { p_name: string }; Returns: string }
+      pipeline_dispatch: {
+        Args: { p_body?: Json; p_path: string }
+        Returns: number
+      }
       set_provider_secret: {
         Args: { p_name: string; p_value: string }
         Returns: undefined
