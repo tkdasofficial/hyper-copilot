@@ -10,33 +10,331 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AudioRouteImport } from './routes/audio'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ImageRouteImport } from './routes/image'
+import { Route as LibraryRouteImport } from './routes/library'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as VerifyRouteImport } from './routes/verify'
+import { Route as VideoRouteImport } from './routes/video'
+import { Route as VideoAgentRouteImport } from './routes/video-agent'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedGettingReadyRouteImport } from './routes/_authenticated/getting-ready'
+import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
+import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
+import { Route as VirtualModelIndexRouteImport } from './routes/virtual-model.index'
+import { Route as VirtualModelCreateModelRouteImport } from './routes/virtual-model.create-model'
+import { Route as AuthenticatedWorkflowsIndexRouteImport } from './routes/_authenticated/workflows.index'
+import { Route as AuthenticatedWorkflowsCreateRouteImport } from './routes/_authenticated/workflows.create'
+import { Route as OauthMetaReturnRouteImport } from './routes/oauth/meta/return'
+import { Route as ApiPublicJobsWorkerRouteImport } from './routes/api/public/jobs/worker'
+import { Route as ApiPublicWorkflowsSchedulerRouteImport } from './routes/api/public/workflows/scheduler'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AudioRoute = AudioRouteImport.update({
+  id: '/audio',
+  path: '/audio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImageRoute = ImageRouteImport.update({
+  id: '/image',
+  path: '/image',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyRoute = VerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VideoRoute = VideoRouteImport.update({
+  id: '/video',
+  path: '/video',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VideoAgentRoute = VideoAgentRouteImport.update({
+  id: '/video-agent',
+  path: '/video-agent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedGettingReadyRoute =
+  AuthenticatedGettingReadyRouteImport.update({
+    id: '/getting-ready',
+    path: '/getting-ready',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedIntegrationsRoute =
+  AuthenticatedIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
+  id: '/api/generate-image',
+  path: '/api/generate-image',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VirtualModelIndexRoute = VirtualModelIndexRouteImport.update({
+  id: '/virtual-model/',
+  path: '/virtual-model/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VirtualModelCreateModelRoute = VirtualModelCreateModelRouteImport.update({
+  id: '/virtual-model/create-model',
+  path: '/virtual-model/create-model',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedWorkflowsIndexRoute =
+  AuthenticatedWorkflowsIndexRouteImport.update({
+    id: '/workflows/',
+    path: '/workflows/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWorkflowsCreateRoute =
+  AuthenticatedWorkflowsCreateRouteImport.update({
+    id: '/workflows/create',
+    path: '/workflows/create',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const OauthMetaReturnRoute = OauthMetaReturnRouteImport.update({
+  id: '/oauth/meta/return',
+  path: '/oauth/meta/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicJobsWorkerRoute = ApiPublicJobsWorkerRouteImport.update({
+  id: '/api/public/jobs/worker',
+  path: '/api/public/jobs/worker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicWorkflowsSchedulerRoute =
+  ApiPublicWorkflowsSchedulerRouteImport.update({
+    id: '/api/public/workflows/scheduler',
+    path: '/api/public/workflows/scheduler',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/audio': typeof AudioRoute
+  '/auth': typeof AuthRoute
+  '/image': typeof ImageRoute
+  '/library': typeof LibraryRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
+  '/verify': typeof VerifyRoute
+  '/video': typeof VideoRoute
+  '/video-agent': typeof VideoAgentRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/getting-ready': typeof AuthenticatedGettingReadyRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
+  '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
+  '/virtual-model/': typeof VirtualModelIndexRoute
+  '/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
+  '/oauth/meta/return': typeof OauthMetaReturnRoute
+  '/workflows/': typeof AuthenticatedWorkflowsIndexRoute
+  '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/audio': typeof AudioRoute
+  '/auth': typeof AuthRoute
+  '/image': typeof ImageRoute
+  '/library': typeof LibraryRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
+  '/verify': typeof VerifyRoute
+  '/video': typeof VideoRoute
+  '/video-agent': typeof VideoAgentRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/getting-ready': typeof AuthenticatedGettingReadyRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
+  '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
+  '/virtual-model': typeof VirtualModelIndexRoute
+  '/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
+  '/oauth/meta/return': typeof OauthMetaReturnRoute
+  '/workflows': typeof AuthenticatedWorkflowsIndexRoute
+  '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/audio': typeof AudioRoute
+  '/auth': typeof AuthRoute
+  '/image': typeof ImageRoute
+  '/library': typeof LibraryRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
+  '/verify': typeof VerifyRoute
+  '/video': typeof VideoRoute
+  '/video-agent': typeof VideoAgentRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/getting-ready': typeof AuthenticatedGettingReadyRoute
+  '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
+  '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
+  '/virtual-model/': typeof VirtualModelIndexRoute
+  '/_authenticated/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
+  '/oauth/meta/return': typeof OauthMetaReturnRoute
+  '/_authenticated/workflows/': typeof AuthenticatedWorkflowsIndexRoute
+  '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/audio'
+    | '/auth'
+    | '/image'
+    | '/library'
+    | '/pricing'
+    | '/privacy'
+    | '/settings'
+    | '/terms'
+    | '/verify'
+    | '/video'
+    | '/video-agent'
+    | '/dashboard'
+    | '/getting-ready'
+    | '/integrations'
+    | '/api/generate-image'
+    | '/virtual-model/create-model'
+    | '/virtual-model/'
+    | '/workflows/create'
+    | '/oauth/meta/return'
+    | '/workflows/'
+    | '/api/public/jobs/worker'
+    | '/api/public/workflows/scheduler'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/audio'
+    | '/auth'
+    | '/image'
+    | '/library'
+    | '/pricing'
+    | '/privacy'
+    | '/settings'
+    | '/terms'
+    | '/verify'
+    | '/video'
+    | '/video-agent'
+    | '/dashboard'
+    | '/getting-ready'
+    | '/integrations'
+    | '/api/generate-image'
+    | '/virtual-model/create-model'
+    | '/virtual-model'
+    | '/workflows/create'
+    | '/oauth/meta/return'
+    | '/workflows'
+    | '/api/public/jobs/worker'
+    | '/api/public/workflows/scheduler'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/audio'
+    | '/auth'
+    | '/image'
+    | '/library'
+    | '/pricing'
+    | '/privacy'
+    | '/settings'
+    | '/terms'
+    | '/verify'
+    | '/video'
+    | '/video-agent'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/getting-ready'
+    | '/_authenticated/integrations'
+    | '/api/generate-image'
+    | '/virtual-model/create-model'
+    | '/virtual-model/'
+    | '/_authenticated/workflows/create'
+    | '/oauth/meta/return'
+    | '/_authenticated/workflows/'
+    | '/api/public/jobs/worker'
+    | '/api/public/workflows/scheduler'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AudioRoute: typeof AudioRoute
+  AuthRoute: typeof AuthRoute
+  ImageRoute: typeof ImageRoute
+  LibraryRoute: typeof LibraryRoute
+  PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
+  SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
+  VerifyRoute: typeof VerifyRoute
+  VideoRoute: typeof VideoRoute
+  VideoAgentRoute: typeof VideoAgentRoute
+  ApiGenerateImageRoute: typeof ApiGenerateImageRoute
+  VirtualModelCreateModelRoute: typeof VirtualModelCreateModelRoute
+  VirtualModelIndexRoute: typeof VirtualModelIndexRoute
+  OauthMetaReturnRoute: typeof OauthMetaReturnRoute
+  ApiPublicJobsWorkerRoute: typeof ApiPublicJobsWorkerRoute
+  ApiPublicWorkflowsSchedulerRoute: typeof ApiPublicWorkflowsSchedulerRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +346,209 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/audio': {
+      id: '/audio'
+      path: '/audio'
+      fullPath: '/audio'
+      preLoaderRoute: typeof AudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/image': {
+      id: '/image'
+      path: '/image'
+      fullPath: '/image'
+      preLoaderRoute: typeof ImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify': {
+      id: '/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof VerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/video': {
+      id: '/video'
+      path: '/video'
+      fullPath: '/video'
+      preLoaderRoute: typeof VideoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/video-agent': {
+      id: '/video-agent'
+      path: '/video-agent'
+      fullPath: '/video-agent'
+      preLoaderRoute: typeof VideoAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/getting-ready': {
+      id: '/_authenticated/getting-ready'
+      path: '/getting-ready'
+      fullPath: '/getting-ready'
+      preLoaderRoute: typeof AuthenticatedGettingReadyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/integrations': {
+      id: '/_authenticated/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof AuthenticatedIntegrationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/generate-image': {
+      id: '/api/generate-image'
+      path: '/api/generate-image'
+      fullPath: '/api/generate-image'
+      preLoaderRoute: typeof ApiGenerateImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/virtual-model/': {
+      id: '/virtual-model/'
+      path: '/virtual-model'
+      fullPath: '/virtual-model/'
+      preLoaderRoute: typeof VirtualModelIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/virtual-model/create-model': {
+      id: '/virtual-model/create-model'
+      path: '/virtual-model/create-model'
+      fullPath: '/virtual-model/create-model'
+      preLoaderRoute: typeof VirtualModelCreateModelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/workflows/': {
+      id: '/_authenticated/workflows/'
+      path: '/workflows'
+      fullPath: '/workflows/'
+      preLoaderRoute: typeof AuthenticatedWorkflowsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/workflows/create': {
+      id: '/_authenticated/workflows/create'
+      path: '/workflows/create'
+      fullPath: '/workflows/create'
+      preLoaderRoute: typeof AuthenticatedWorkflowsCreateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/oauth/meta/return': {
+      id: '/oauth/meta/return'
+      path: '/oauth/meta/return'
+      fullPath: '/oauth/meta/return'
+      preLoaderRoute: typeof OauthMetaReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/jobs/worker': {
+      id: '/api/public/jobs/worker'
+      path: '/api/public/jobs/worker'
+      fullPath: '/api/public/jobs/worker'
+      preLoaderRoute: typeof ApiPublicJobsWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/workflows/scheduler': {
+      id: '/api/public/workflows/scheduler'
+      path: '/api/public/workflows/scheduler'
+      fullPath: '/api/public/workflows/scheduler'
+      preLoaderRoute: typeof ApiPublicWorkflowsSchedulerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedGettingReadyRoute: typeof AuthenticatedGettingReadyRoute
+  AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
+  AuthenticatedWorkflowsCreateRoute: typeof AuthenticatedWorkflowsCreateRoute
+  AuthenticatedWorkflowsIndexRoute: typeof AuthenticatedWorkflowsIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedGettingReadyRoute: AuthenticatedGettingReadyRoute,
+  AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
+  AuthenticatedWorkflowsCreateRoute: AuthenticatedWorkflowsCreateRoute,
+  AuthenticatedWorkflowsIndexRoute: AuthenticatedWorkflowsIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AudioRoute: AudioRoute,
+  AuthRoute: AuthRoute,
+  ImageRoute: ImageRoute,
+  LibraryRoute: LibraryRoute,
+  PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
+  SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
+  VerifyRoute: VerifyRoute,
+  VideoRoute: VideoRoute,
+  VideoAgentRoute: VideoAgentRoute,
+  ApiGenerateImageRoute: ApiGenerateImageRoute,
+  VirtualModelCreateModelRoute: VirtualModelCreateModelRoute,
+  VirtualModelIndexRoute: VirtualModelIndexRoute,
+  OauthMetaReturnRoute: OauthMetaReturnRoute,
+  ApiPublicJobsWorkerRoute: ApiPublicJobsWorkerRoute,
+  ApiPublicWorkflowsSchedulerRoute: ApiPublicWorkflowsSchedulerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
