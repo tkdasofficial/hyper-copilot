@@ -124,7 +124,17 @@ function AuthPage() {
       return;
     }
 
+    // Supabase hides account existence by returning a user with no identities
+    // instead of an error. Treat that as "this email already has an account".
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      setStep("login");
+      setPassword("");
+      toast.info("You already have an account. Enter your password to sign in.");
+      return;
+    }
+
     window.sessionStorage.setItem("hyper:pending-email", email.trim());
+
 
     if (data.session?.user.email_confirmed_at) {
       navigate({ to: "/getting-ready", replace: true });
