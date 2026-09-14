@@ -25,7 +25,6 @@ import { Route as VideoAgentRouteImport } from './routes/video-agent'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedGettingReadyRouteImport } from './routes/_authenticated/getting-ready'
 import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
-import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as VirtualModelIndexRouteImport } from './routes/virtual-model.index'
 import { Route as VirtualModelCreateModelRouteImport } from './routes/virtual-model.create-model'
 import { Route as AuthenticatedWorkflowsIndexRouteImport } from './routes/_authenticated/workflows.index'
@@ -117,11 +116,6 @@ const AuthenticatedIntegrationsRoute =
     path: '/integrations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
-  id: '/api/generate-image',
-  path: '/api/generate-image',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VirtualModelIndexRoute = VirtualModelIndexRouteImport.update({
   id: '/virtual-model/',
   path: '/virtual-model/',
@@ -187,7 +181,6 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/getting-ready': typeof AuthenticatedGettingReadyRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
-  '/api/generate-image': typeof ApiGenerateImageRoute
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model/': typeof VirtualModelIndexRoute
   '/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
@@ -214,7 +207,6 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/getting-ready': typeof AuthenticatedGettingReadyRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
-  '/api/generate-image': typeof ApiGenerateImageRoute
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model': typeof VirtualModelIndexRoute
   '/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
@@ -243,7 +235,6 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/getting-ready': typeof AuthenticatedGettingReadyRoute
   '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
-  '/api/generate-image': typeof ApiGenerateImageRoute
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model/': typeof VirtualModelIndexRoute
   '/_authenticated/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
@@ -272,7 +263,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/getting-ready'
     | '/integrations'
-    | '/api/generate-image'
     | '/virtual-model/create-model'
     | '/virtual-model/'
     | '/workflows/create'
@@ -299,7 +289,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/getting-ready'
     | '/integrations'
-    | '/api/generate-image'
     | '/virtual-model/create-model'
     | '/virtual-model'
     | '/workflows/create'
@@ -327,7 +316,6 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/getting-ready'
     | '/_authenticated/integrations'
-    | '/api/generate-image'
     | '/virtual-model/create-model'
     | '/virtual-model/'
     | '/_authenticated/workflows/create'
@@ -353,7 +341,6 @@ export interface RootRouteChildren {
   VerifyRoute: typeof VerifyRoute
   VideoRoute: typeof VideoRoute
   VideoAgentRoute: typeof VideoAgentRoute
-  ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   VirtualModelCreateModelRoute: typeof VirtualModelCreateModelRoute
   VirtualModelIndexRoute: typeof VirtualModelIndexRoute
   OauthMetaReturnRoute: typeof OauthMetaReturnRoute
@@ -477,13 +464,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIntegrationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/generate-image': {
-      id: '/api/generate-image'
-      path: '/api/generate-image'
-      fullPath: '/api/generate-image'
-      preLoaderRoute: typeof ApiGenerateImageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/virtual-model/': {
       id: '/virtual-model/'
       path: '/virtual-model'
@@ -583,7 +563,6 @@ const rootRouteChildren: RootRouteChildren = {
   VerifyRoute: VerifyRoute,
   VideoRoute: VideoRoute,
   VideoAgentRoute: VideoAgentRoute,
-  ApiGenerateImageRoute: ApiGenerateImageRoute,
   VirtualModelCreateModelRoute: VirtualModelCreateModelRoute,
   VirtualModelIndexRoute: VirtualModelIndexRoute,
   OauthMetaReturnRoute: OauthMetaReturnRoute,
