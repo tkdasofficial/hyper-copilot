@@ -5,7 +5,6 @@ import { CheckCircle2, Loader2, ListChecks, XCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { listJobs } from "@/lib/jobs.functions";
-import { kickWorker } from "@/lib/jobs-runner";
 import { jobKindLabel, type JobRecord } from "@/lib/jobs.shared";
 
 /** Tasks are per-account, so only poll once a session exists. */
@@ -67,7 +66,6 @@ export function BackgroundTasks() {
       <Popover>
         <PopoverTrigger
           onClick={() => {
-            void kickWorker();
             void queryClient.invalidateQueries({ queryKey: ["jobs"] });
           }}
           className={cn(

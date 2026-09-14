@@ -1,10 +1,17 @@
 /**
  * Server-only Video Agent helpers.
  *
- * Both the interactive Video Agent page and the workflow scheduler need the
- * exact same behaviour: reserve a render credit, create the pending `videos`
- * row and ask the external GitHub render pipeline to build it. It lives here so
- * neither path duplicates (or drifts from) the other.
+ * A render is two server-side steps that never share a request with the browser:
+ *
+ *   1. `createVideoRequest` — the only thing a user action does: a quick credit
+ *      sanity check and a pending `videos` row. A database trigger on that insert
+ *      hands the row to the pipeline.
+ *   2. `dispatchVideoRender` — runs in the pipeline (`/api/public/pipeline/render`
+ *      or the per-minute tick): reserves the credit, asks the external GitHub
+ *      render pipeline to build the video and records the outcome on the row.
+ *
+ * Both the interactive Video Agent page and the workflow scheduler go through
+ * the same two steps, so neither path can drift from the other.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -35,6 +42,10 @@ export type VideoRenderConfig = {
 
 type Client = SupabaseClient<Database>;
 
+/** Step marker a fresh row carries until the pipeline claims it. */
+export const RENDER_STEP_QUEUED = "queued";
+const RENDER_STEP_DISPATCHING = "dispatching";
+
 /** Captions are always white; the style string only carries the font size. */
 function captionSizeToken(captionStyle: string): "small" | "medium" | "large" {
   const value = (captionStyle ?? "").toLowerCase();
@@ -43,110 +54,182 @@ function captionSizeToken(captionStyle: string): "small" | "medium" | "large" {
   return "small";
 }
 
-/** Reserves a credit, inserts the pending row and dispatches the render. */
-export async function createVideoRender(
-  supabase: Client,
-  userId: string,
-  data: VideoRenderConfig,
-): Promise<string> {
+async function readCredits(supabase: Client, userId: string) {
   const { data: sub } = await supabase
     .from("subscriptions")
     .select("monthly_quota, credits_used, video_credits")
     .eq("user_id", userId)
     .maybeSingle();
-
-  if (!sub) throw new Error("No active plan was found on your account.");
-
+  if (!sub) return null;
   const videoCredits = sub.video_credits ?? 0;
-  const remainingQuota = Math.max((sub.monthly_quota ?? 0) - (sub.credits_used ?? 0), 0);
+  const creditsUsed = sub.credits_used ?? 0;
+  const remainingQuota = Math.max((sub.monthly_quota ?? 0) - creditsUsed, 0);
+  return { videoCredits, creditsUsed, remainingQuota };
+}
 
-  if (videoCredits <= 0 && remainingQuota <= 0) {
+/**
+ * Creates the pending `videos` row. The `videos_dispatch_pipeline` database
+ * trigger picks it up from here — no caller ever talks to the render pipeline.
+ */
+export async function createVideoRequest(
+  supabase: Client,
+  userId: string,
+  data: VideoRenderConfig,
+): Promise<string> {
+  const credits = await readCredits(supabase, userId);
+  if (!credits) throw new Error("No active plan was found on your account.");
+  if (credits.videoCredits <= 0 && credits.remainingQuota <= 0) {
     throw new Error("You are out of render credits. Upgrade your plan to keep creating videos.");
   }
 
+  const { data: row, error } = await supabase
+    .from("videos")
+    .insert({ ...data, user_id: userId, status: "pending", step: RENDER_STEP_QUEUED, progress: 0 })
+    .select("id")
+    .single();
+
+  if (error || !row) throw new Error(error?.message ?? "Could not create the video record");
+  return row.id as string;
+}
+
+export type DispatchOutcome = "dispatched" | "skipped" | "failed";
+
+/**
+ * Pipeline side: claims a pending row, reserves the credit and dispatches the
+ * render. Safe to call repeatedly — the claim is atomic, so a row is only ever
+ * dispatched once even when the trigger and the tick race.
+ */
+export async function dispatchVideoRender(admin: Client, videoId: string): Promise<DispatchOutcome> {
+  const { data: claimed } = await admin
+    .from("videos")
+    .update({ step: RENDER_STEP_DISPATCHING })
+    .eq("id", videoId)
+    .eq("status", "pending")
+    .eq("step", RENDER_STEP_QUEUED)
+    .select("*")
+    .maybeSingle();
+  if (!claimed) return "skipped";
+
+  const video = claimed;
+  const userId = video.user_id;
+
+  const fail = async (message: string) => {
+    await admin
+      .from("videos")
+      .update({ status: "failed", step: "failed", error: message })
+      .eq("id", videoId);
+    return "failed" as const;
+  };
+
+  // a. Credit reservation (video credits first, then the monthly quota).
+  const credits = await readCredits(admin, userId);
+  if (!credits) return fail("No active plan was found on your account.");
+  if (credits.videoCredits <= 0 && credits.remainingQuota <= 0) {
+    return fail("You are out of render credits. Upgrade your plan to keep creating videos.");
+  }
   const spend =
-    videoCredits > 0
-      ? { video_credits: videoCredits - 1 }
-      : { credits_used: (sub.credits_used ?? 0) + 1 };
-
-  const { error: spendError } = await supabase
-    .from("subscriptions")
-    .update(spend)
-    .eq("user_id", userId);
-
-  if (spendError) throw new Error("Could not reserve a render credit. Please try again.");
+    credits.videoCredits > 0
+      ? { video_credits: credits.videoCredits - 1 }
+      : { credits_used: credits.creditsUsed + 1 };
+  const { error: spendError } = await admin.from("subscriptions").update(spend).eq("user_id", userId);
+  if (spendError) return fail("Could not reserve a render credit. Please try again.");
 
   const refund = async () => {
-    await supabase
+    await admin
       .from("subscriptions")
       .update(
-        videoCredits > 0 ? { video_credits: videoCredits } : { credits_used: sub.credits_used ?? 0 },
+        credits.videoCredits > 0
+          ? { video_credits: credits.videoCredits }
+          : { credits_used: credits.creditsUsed },
       )
       .eq("user_id", userId);
   };
 
-  const { data: row, error } = await supabase
-    .from("videos")
-    .insert({ ...data, user_id: userId, status: "pending", step: "queued", progress: 0 })
-    .select("id")
-    .single();
-
-  if (error || !row) {
-    await refund();
-    throw new Error(error?.message ?? "Could not create the video record");
-  }
-
-  const videoId = row.id as string;
+  // b. repository_dispatch into the external Video Engine repository.
   const token = (process.env["GITHUB_PAT"] ?? "").trim();
-
-  const fail = async (message: string) => {
-    await supabase.from("videos").update({ status: "failed", error: message }).eq("id", videoId);
-    await refund();
-    throw new Error(message);
-  };
-
   if (!token) {
-    await fail(
+    await refund();
+    return fail(
       `The Video Engine access token is not configured yet. Add the GITHUB_PAT secret with access to ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}.`,
     );
   }
 
-  const res = await fetch(GITHUB_DISPATCH_URL, {
-    method: "POST",
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-      "Content-Type": "application/json",
-      "User-Agent": "hyper-copilot-video-agent",
-    },
-    body: JSON.stringify({
-      event_type: GITHUB_DISPATCH_EVENT,
-      client_payload: {
-        video_id: videoId,
-        user_id: userId,
-        prompt: data.prompt,
-        negative_prompt: data.negative_prompt,
-        voice_gender: data.voice_gender,
-        image_style: data.image_style,
-        aspect_ratio: data.aspect_ratio,
-        duration_seconds: String(data.duration_seconds),
-        // GitHub allows 10 client_payload properties, so the captions flag also
-        // carries the caption size: false | small | medium | large.
-        captions: data.captions ? captionSizeToken(data.caption_style) : "false",
+  let res: Response;
+  try {
+    res = await fetch(GITHUB_DISPATCH_URL, {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "User-Agent": "hyper-copilot-video-agent",
       },
-    }),
-  });
+      body: JSON.stringify({
+        event_type: GITHUB_DISPATCH_EVENT,
+        client_payload: {
+          video_id: videoId,
+          user_id: userId,
+          prompt: video.prompt,
+          negative_prompt: video.negative_prompt,
+          voice_gender: video.voice_gender,
+          image_style: video.image_style,
+          aspect_ratio: video.aspect_ratio,
+          duration_seconds: String(video.duration_seconds),
+          // GitHub allows 10 client_payload properties, so the captions flag also
+          // carries the caption size: false | small | medium | large.
+          captions: video.captions ? captionSizeToken(video.caption_style) : "false",
+        },
+      }),
+    });
+  } catch (err) {
+    await refund();
+    return fail(
+      `Could not reach the render pipeline. ${err instanceof Error ? err.message : ""}`.trim(),
+    );
+  }
 
   if (!res.ok) {
     const detail = (await res.text()).slice(0, 300);
-    await fail(`The render pipeline refused the job (${res.status}). ${detail}`);
+    await refund();
+    return fail(`The render pipeline refused the job (${res.status}). ${detail}`);
   }
 
-  await supabase
+  await admin
     .from("videos")
     .update({ status: "processing", step: "Initializing Video Engine" })
     .eq("id", videoId);
 
-  return videoId;
+  return "dispatched";
+}
+
+/**
+ * Dispatches one specific request, or sweeps every request that has waited
+ * longer than `olderThanSeconds` (the trigger call was lost or the app was down).
+ */
+export async function dispatchPendingRenders(
+  admin: Client,
+  options: { videoId?: string | null; olderThanSeconds?: number; limit?: number } = {},
+) {
+  const outcomes: { id: string; outcome: DispatchOutcome }[] = [];
+
+  if (options.videoId) {
+    outcomes.push({ id: options.videoId, outcome: await dispatchVideoRender(admin, options.videoId) });
+    return outcomes;
+  }
+
+  const cutoff = new Date(Date.now() - (options.olderThanSeconds ?? 30) * 1000).toISOString();
+  const { data: stale } = await admin
+    .from("videos")
+    .select("id")
+    .eq("status", "pending")
+    .eq("step", RENDER_STEP_QUEUED)
+    .lt("created_at", cutoff)
+    .order("created_at", { ascending: true })
+    .limit(options.limit ?? 5);
+
+  for (const row of stale ?? []) {
+    outcomes.push({ id: row.id, outcome: await dispatchVideoRender(admin, row.id) });
+  }
+  return outcomes;
 }

@@ -25,13 +25,14 @@ import { Route as VideoAgentRouteImport } from './routes/video-agent'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedGettingReadyRouteImport } from './routes/_authenticated/getting-ready'
 import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
-import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as VirtualModelIndexRouteImport } from './routes/virtual-model.index'
 import { Route as VirtualModelCreateModelRouteImport } from './routes/virtual-model.create-model'
 import { Route as AuthenticatedWorkflowsIndexRouteImport } from './routes/_authenticated/workflows.index'
 import { Route as AuthenticatedWorkflowsCreateRouteImport } from './routes/_authenticated/workflows.create'
 import { Route as OauthMetaReturnRouteImport } from './routes/oauth/meta/return'
 import { Route as ApiPublicJobsWorkerRouteImport } from './routes/api/public/jobs/worker'
+import { Route as ApiPublicPipelineRenderRouteImport } from './routes/api/public/pipeline/render'
+import { Route as ApiPublicPipelineTickRouteImport } from './routes/api/public/pipeline/tick'
 import { Route as ApiPublicWorkflowsSchedulerRouteImport } from './routes/api/public/workflows/scheduler'
 
 const IndexRoute = IndexRouteImport.update({
@@ -115,11 +116,6 @@ const AuthenticatedIntegrationsRoute =
     path: '/integrations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
-  id: '/api/generate-image',
-  path: '/api/generate-image',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VirtualModelIndexRoute = VirtualModelIndexRouteImport.update({
   id: '/virtual-model/',
   path: '/virtual-model/',
@@ -152,6 +148,16 @@ const ApiPublicJobsWorkerRoute = ApiPublicJobsWorkerRouteImport.update({
   path: '/api/public/jobs/worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPipelineRenderRoute = ApiPublicPipelineRenderRouteImport.update({
+  id: '/api/public/pipeline/render',
+  path: '/api/public/pipeline/render',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPipelineTickRoute = ApiPublicPipelineTickRouteImport.update({
+  id: '/api/public/pipeline/tick',
+  path: '/api/public/pipeline/tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWorkflowsSchedulerRoute =
   ApiPublicWorkflowsSchedulerRouteImport.update({
     id: '/api/public/workflows/scheduler',
@@ -175,13 +181,14 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/getting-ready': typeof AuthenticatedGettingReadyRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
-  '/api/generate-image': typeof ApiGenerateImageRoute
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model/': typeof VirtualModelIndexRoute
   '/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/workflows/': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/pipeline/render': typeof ApiPublicPipelineRenderRoute
+  '/api/public/pipeline/tick': typeof ApiPublicPipelineTickRoute
   '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRoutesByTo {
@@ -200,13 +207,14 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/getting-ready': typeof AuthenticatedGettingReadyRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
-  '/api/generate-image': typeof ApiGenerateImageRoute
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model': typeof VirtualModelIndexRoute
   '/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/workflows': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/pipeline/render': typeof ApiPublicPipelineRenderRoute
+  '/api/public/pipeline/tick': typeof ApiPublicPipelineTickRoute
   '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRoutesById {
@@ -227,13 +235,14 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/getting-ready': typeof AuthenticatedGettingReadyRoute
   '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
-  '/api/generate-image': typeof ApiGenerateImageRoute
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model/': typeof VirtualModelIndexRoute
   '/_authenticated/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/_authenticated/workflows/': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
+  '/api/public/pipeline/render': typeof ApiPublicPipelineRenderRoute
+  '/api/public/pipeline/tick': typeof ApiPublicPipelineTickRoute
   '/api/public/workflows/scheduler': typeof ApiPublicWorkflowsSchedulerRoute
 }
 export interface FileRouteTypes {
@@ -254,13 +263,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/getting-ready'
     | '/integrations'
-    | '/api/generate-image'
     | '/virtual-model/create-model'
     | '/virtual-model/'
     | '/workflows/create'
     | '/oauth/meta/return'
     | '/workflows/'
     | '/api/public/jobs/worker'
+    | '/api/public/pipeline/render'
+    | '/api/public/pipeline/tick'
     | '/api/public/workflows/scheduler'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -279,13 +289,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/getting-ready'
     | '/integrations'
-    | '/api/generate-image'
     | '/virtual-model/create-model'
     | '/virtual-model'
     | '/workflows/create'
     | '/oauth/meta/return'
     | '/workflows'
     | '/api/public/jobs/worker'
+    | '/api/public/pipeline/render'
+    | '/api/public/pipeline/tick'
     | '/api/public/workflows/scheduler'
   id:
     | '__root__'
@@ -305,13 +316,14 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/getting-ready'
     | '/_authenticated/integrations'
-    | '/api/generate-image'
     | '/virtual-model/create-model'
     | '/virtual-model/'
     | '/_authenticated/workflows/create'
     | '/oauth/meta/return'
     | '/_authenticated/workflows/'
     | '/api/public/jobs/worker'
+    | '/api/public/pipeline/render'
+    | '/api/public/pipeline/tick'
     | '/api/public/workflows/scheduler'
   fileRoutesById: FileRoutesById
 }
@@ -329,11 +341,12 @@ export interface RootRouteChildren {
   VerifyRoute: typeof VerifyRoute
   VideoRoute: typeof VideoRoute
   VideoAgentRoute: typeof VideoAgentRoute
-  ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   VirtualModelCreateModelRoute: typeof VirtualModelCreateModelRoute
   VirtualModelIndexRoute: typeof VirtualModelIndexRoute
   OauthMetaReturnRoute: typeof OauthMetaReturnRoute
   ApiPublicJobsWorkerRoute: typeof ApiPublicJobsWorkerRoute
+  ApiPublicPipelineRenderRoute: typeof ApiPublicPipelineRenderRoute
+  ApiPublicPipelineTickRoute: typeof ApiPublicPipelineTickRoute
   ApiPublicWorkflowsSchedulerRoute: typeof ApiPublicWorkflowsSchedulerRoute
 }
 
@@ -451,13 +464,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIntegrationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/generate-image': {
-      id: '/api/generate-image'
-      path: '/api/generate-image'
-      fullPath: '/api/generate-image'
-      preLoaderRoute: typeof ApiGenerateImageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/virtual-model/': {
       id: '/virtual-model/'
       path: '/virtual-model'
@@ -498,6 +504,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/jobs/worker'
       fullPath: '/api/public/jobs/worker'
       preLoaderRoute: typeof ApiPublicJobsWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pipeline/render': {
+      id: '/api/public/pipeline/render'
+      path: '/api/public/pipeline/render'
+      fullPath: '/api/public/pipeline/render'
+      preLoaderRoute: typeof ApiPublicPipelineRenderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pipeline/tick': {
+      id: '/api/public/pipeline/tick'
+      path: '/api/public/pipeline/tick'
+      fullPath: '/api/public/pipeline/tick'
+      preLoaderRoute: typeof ApiPublicPipelineTickRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/workflows/scheduler': {
@@ -543,11 +563,12 @@ const rootRouteChildren: RootRouteChildren = {
   VerifyRoute: VerifyRoute,
   VideoRoute: VideoRoute,
   VideoAgentRoute: VideoAgentRoute,
-  ApiGenerateImageRoute: ApiGenerateImageRoute,
   VirtualModelCreateModelRoute: VirtualModelCreateModelRoute,
   VirtualModelIndexRoute: VirtualModelIndexRoute,
   OauthMetaReturnRoute: OauthMetaReturnRoute,
   ApiPublicJobsWorkerRoute: ApiPublicJobsWorkerRoute,
+  ApiPublicPipelineRenderRoute: ApiPublicPipelineRenderRoute,
+  ApiPublicPipelineTickRoute: ApiPublicPipelineTickRoute,
   ApiPublicWorkflowsSchedulerRoute: ApiPublicWorkflowsSchedulerRoute,
 }
 export const routeTree = rootRouteImport
