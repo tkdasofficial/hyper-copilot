@@ -29,6 +29,7 @@ import { Route as VirtualModelIndexRouteImport } from './routes/virtual-model.in
 import { Route as VirtualModelCreateModelRouteImport } from './routes/virtual-model.create-model'
 import { Route as AuthenticatedWorkflowsIndexRouteImport } from './routes/_authenticated/workflows.index'
 import { Route as AuthenticatedWorkflowsCreateRouteImport } from './routes/_authenticated/workflows.create'
+import { Route as OauthGoogleReturnRouteImport } from './routes/oauth/google/return'
 import { Route as OauthMetaReturnRouteImport } from './routes/oauth/meta/return'
 import { Route as ApiPublicJobsWorkerRouteImport } from './routes/api/public/jobs/worker'
 import { Route as ApiPublicPipelineRenderRouteImport } from './routes/api/public/pipeline/render'
@@ -138,6 +139,11 @@ const AuthenticatedWorkflowsCreateRoute =
     path: '/workflows/create',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const OauthGoogleReturnRoute = OauthGoogleReturnRouteImport.update({
+  id: '/oauth/google/return',
+  path: '/oauth/google/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OauthMetaReturnRoute = OauthMetaReturnRouteImport.update({
   id: '/oauth/meta/return',
   path: '/oauth/meta/return',
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model/': typeof VirtualModelIndexRoute
   '/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
+  '/oauth/google/return': typeof OauthGoogleReturnRoute
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/workflows/': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
@@ -210,6 +217,7 @@ export interface FileRoutesByTo {
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model': typeof VirtualModelIndexRoute
   '/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
+  '/oauth/google/return': typeof OauthGoogleReturnRoute
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/workflows': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/virtual-model/create-model': typeof VirtualModelCreateModelRoute
   '/virtual-model/': typeof VirtualModelIndexRoute
   '/_authenticated/workflows/create': typeof AuthenticatedWorkflowsCreateRoute
+  '/oauth/google/return': typeof OauthGoogleReturnRoute
   '/oauth/meta/return': typeof OauthMetaReturnRoute
   '/_authenticated/workflows/': typeof AuthenticatedWorkflowsIndexRoute
   '/api/public/jobs/worker': typeof ApiPublicJobsWorkerRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/virtual-model/create-model'
     | '/virtual-model/'
     | '/workflows/create'
+    | '/oauth/google/return'
     | '/oauth/meta/return'
     | '/workflows/'
     | '/api/public/jobs/worker'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/virtual-model/create-model'
     | '/virtual-model'
     | '/workflows/create'
+    | '/oauth/google/return'
     | '/oauth/meta/return'
     | '/workflows'
     | '/api/public/jobs/worker'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/virtual-model/create-model'
     | '/virtual-model/'
     | '/_authenticated/workflows/create'
+    | '/oauth/google/return'
     | '/oauth/meta/return'
     | '/_authenticated/workflows/'
     | '/api/public/jobs/worker'
@@ -343,6 +355,7 @@ export interface RootRouteChildren {
   VideoAgentRoute: typeof VideoAgentRoute
   VirtualModelCreateModelRoute: typeof VirtualModelCreateModelRoute
   VirtualModelIndexRoute: typeof VirtualModelIndexRoute
+  OauthGoogleReturnRoute: typeof OauthGoogleReturnRoute
   OauthMetaReturnRoute: typeof OauthMetaReturnRoute
   ApiPublicJobsWorkerRoute: typeof ApiPublicJobsWorkerRoute
   ApiPublicPipelineRenderRoute: typeof ApiPublicPipelineRenderRoute
@@ -492,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkflowsCreateRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/oauth/google/return': {
+      id: '/oauth/google/return'
+      path: '/oauth/google/return'
+      fullPath: '/oauth/google/return'
+      preLoaderRoute: typeof OauthGoogleReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oauth/meta/return': {
       id: '/oauth/meta/return'
       path: '/oauth/meta/return'
@@ -565,6 +585,7 @@ const rootRouteChildren: RootRouteChildren = {
   VideoAgentRoute: VideoAgentRoute,
   VirtualModelCreateModelRoute: VirtualModelCreateModelRoute,
   VirtualModelIndexRoute: VirtualModelIndexRoute,
+  OauthGoogleReturnRoute: OauthGoogleReturnRoute,
   OauthMetaReturnRoute: OauthMetaReturnRoute,
   ApiPublicJobsWorkerRoute: ApiPublicJobsWorkerRoute,
   ApiPublicPipelineRenderRoute: ApiPublicPipelineRenderRoute,

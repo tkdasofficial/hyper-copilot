@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Facebook, Instagram, Loader2, AtSign, Plug, Trash2 } from "lucide-react";
+import { Check, Facebook, Instagram, Loader2, AtSign, Plug, Trash2, Youtube } from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { StudioLayout } from "@/components/hyper/StudioLayout";
 import { useMetaConnect } from "@/components/hyper/useMetaConnect";
+import { useYouTubeConnect } from "@/components/hyper/useYouTubeConnect";
 import { disconnectSocialAccount, listSocialConnections } from "@/lib/social.functions";
 import { PROVIDERS, type SocialProvider } from "@/lib/social.shared";
 
@@ -26,6 +27,7 @@ const ICONS: Record<SocialProvider, typeof Facebook> = {
   facebook_page: Facebook,
   instagram: Instagram,
   threads: AtSign,
+  youtube: Youtube,
 };
 
 function IntegrationsPage() {
