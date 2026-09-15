@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { CAPTION_TEMPLATES } from "@/lib/social.shared";
+import { ART_STYLES, IMAGE_STYLES, visualStylePrompt } from "@/lib/style-presets";
 
 export const Route = createFileRoute("/video-agent")({
   head: () =>
@@ -55,23 +56,8 @@ const voicePresets = [
   "Deep Storyteller",
   "Awe & Wonder",
 ] as const;
-const artStyles = [
-  "Cinematic Realism",
-  "Anime / Manga",
-  "3D Animated",
-  "Dark Fantasy",
-  "Retro VHS",
-] as const;
-/** Quality enhancers appended for space / cosmic / nature scenes. */
-const sceneEnhancers =
-  "photorealistic, IMAX film grain, cinematic volumetric lighting, hyper-detailed textures, Unreal Engine 5 render style, fine optical details";
-const imageStyles = [
-  "Cosmic Realism",
-  "Cinematic Nature",
-  "Macro Micro-Detail",
-  "Aerial Landscape",
-  "Dreamy Painterly",
-] as const;
+const artStyles = ART_STYLES;
+const imageStyles = IMAGE_STYLES;
 const motionTemplates = [
   "Auto Zoom-In",
   "Pan & Scan",
@@ -104,7 +90,7 @@ const storyThemes = [
   {
     id: "cosmic",
     name: "Cosmic Universe",
-    style: "Cosmic Realism",
+    style: "Photorealistic",
     motion: "Auto Zoom-In",
     voice: "Cosmic Documentary",
     tags: ["deep space", "star field", "volumetric light"],
@@ -112,7 +98,7 @@ const storyThemes = [
   {
     id: "nature",
     name: "Nature Beauty",
-    style: "Cinematic Nature",
+    style: "Cinematic Film",
     motion: "Pan & Scan",
     voice: "Calm Nature Guide",
     tags: ["8K nature detail", "golden hour", "aerial drone"],
@@ -120,7 +106,7 @@ const storyThemes = [
   {
     id: "ocean",
     name: "Ocean & Sky",
-    style: "Aerial Landscape",
+    style: "Studio Photography",
     motion: "Fade Transitions",
     voice: "Deep Storyteller",
     tags: ["aerial drone", "volumetric light"],
@@ -128,7 +114,7 @@ const storyThemes = [
   {
     id: "micro",
     name: "Micro World",
-    style: "Macro Micro-Detail",
+    style: "Photorealistic",
     motion: "Dynamic Keyframe",
     voice: "Awe & Wonder",
     tags: ["macro texture", "8K nature detail"],
@@ -262,8 +248,8 @@ function VideoAgent() {
   const [speed, setSpeed] = useState(110);
   const [pitch, setPitch] = useState(52);
 
-  const [artStyle, setArtStyle] = useState<(typeof artStyles)[number]>("Cinematic Realism");
-  const [imageStyle, setImageStyle] = useState<(typeof imageStyles)[number]>("Cosmic Realism");
+  const [artStyle, setArtStyle] = useState<(typeof artStyles)[number]>(ART_STYLES[0]);
+  const [imageStyle, setImageStyle] = useState<(typeof imageStyles)[number]>(IMAGE_STYLES[0]);
   const [motion, setMotion] = useState<(typeof motionTemplates)[number]>("Auto Zoom-In");
 
   const [captions, setCaptions] = useState(true);
@@ -409,10 +395,7 @@ function VideoAgent() {
       if (tags.length) log(`guidance tags: ${tags.join(", ")}`);
       log("Initializing Video Engine…");
 
-      const isSceneTheme = ["cosmic", "nature", "ocean", "micro"].includes(activeTheme.id);
-      const enrichedPrompt = isSceneTheme
-        ? `${prompt.trim()}, ${sceneEnhancers}`
-        : prompt.trim();
+      const enrichedPrompt = prompt.trim();
 
       const { videoId: id } = await start({
         data: {
@@ -422,7 +405,7 @@ function VideoAgent() {
           voice_persona: preset,
           voice_speed: speed,
           voice_pitch: pitch,
-          image_style: `${artStyle} · ${imageStyle}`,
+          image_style: visualStylePrompt(imageStyle, artStyle),
           motion_template: motion,
           captions,
           caption_style: captionTemplate,
