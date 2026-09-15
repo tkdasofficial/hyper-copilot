@@ -1,0 +1,2 @@
+ALTER TABLE public.social_connections DROP CONSTRAINT IF EXISTS social_connections_provider_check;
+ALTER TABLE public.social_connections ADD CONSTRAINT social_connections_provider_check CHECK (provider IN ('facebook_page', 'instagram', 'threads', 'youtube'));
