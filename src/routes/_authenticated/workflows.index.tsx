@@ -13,6 +13,7 @@ import {
   Plus,
   Settings,
   Trash2,
+  Youtube,
 } from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
@@ -60,6 +61,7 @@ const ICONS: Record<SocialProvider, typeof Facebook> = {
   facebook_page: Facebook,
   instagram: Instagram,
   threads: AtSign,
+  youtube: Youtube,
 };
 
 type StatusTone = "active" | "error" | "disabled" | "processing";
