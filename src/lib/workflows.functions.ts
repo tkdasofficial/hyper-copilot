@@ -123,17 +123,18 @@ export const saveWorkflow = createServerFn({ method: "POST" })
     return { ...input, timeSlots: Array.from(new Set(slots)).sort() };
   })
   .handler(async ({ data, context }): Promise<Workflow> => {
-    const { computeNextDueAt } = await import("@/lib/workflows.server");
+    const { computeSchedulePoints } = await import("@/lib/workflows.server");
 
     const scheduled = data.triggerType === "schedule";
-    const nextDueAt = scheduled
-      ? computeNextDueAt({
+    const points = scheduled
+      ? computeSchedulePoints({
           repeat_rule: data.repeatRule,
           time_slots: data.timeSlots,
           scheduled_at: data.scheduledAt,
           tz_offset: data.tzOffset,
         })
-      : null;
+      : { publishAt: null, wakeAt: null };
+    const nextDueAt = points.wakeAt;
     if (scheduled && data.enabled && !nextDueAt) {
       throw new Error("Choose a future schedule time.");
     }
