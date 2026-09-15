@@ -15,13 +15,11 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  GITHUB_DISPATCH_EVENT,
-  GITHUB_DISPATCH_URL,
-  GITHUB_REPO_NAME,
-  GITHUB_REPO_OWNER,
-} from "../../supabase/config/config";
+import { SUPABASE_URL } from "../../supabase/config/config";
 import type { Database } from "@/integrations/supabase/types";
+
+/** Supabase Edge Function that owns the Video Engine credential. */
+const RENDER_DISPATCH_FUNCTION = `${SUPABASE_URL}/functions/v1/video-agent`;
 
 export type VideoRenderConfig = {
   prompt: string;
