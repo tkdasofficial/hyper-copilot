@@ -671,7 +671,7 @@ export function PromptComposer() {
                 <Popover>
                   <PopoverTrigger asChild>
                     <span>
-                      <Chip icon={Sparkles} active={style.id === "heaven"}>
+                      <Chip icon={Sparkles} active={style.id === IMAGE_STYLES[0]}>
                         {style.name}
                       </Chip>
                     </span>
@@ -686,7 +686,7 @@ export function PromptComposer() {
                           key={s.id}
                           title={s.name}
                           note={s.note}
-                          accent={s.signature}
+                          accent={s.id === IMAGE_STYLES[0]}
                           selected={s.id === style.id}
                           onClick={() => setStyle(s)}
                         />

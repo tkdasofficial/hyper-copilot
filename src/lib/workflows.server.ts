@@ -5,6 +5,7 @@
  */
 
 import { GRAPH_VERSION, type ActionType, type CreationConfig, defaultCreationConfig } from "@/lib/social.shared";
+import { normalizeArtStyle, normalizeImageStyle } from "@/lib/style-presets";
 
 const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const THREADS_GRAPH = "https://graph.threads.net/v1.0";
@@ -177,8 +178,8 @@ export function normalizeCreationConfig(raw: unknown): CreationConfig {
   return {
     instructions: str("instructions", base.instructions),
     category: str("category", base.category),
-    artStyle: str("artStyle", base.artStyle),
-    imageStyle: str("imageStyle", base.imageStyle),
+    artStyle: normalizeArtStyle(value["artStyle"]),
+    imageStyle: normalizeImageStyle(value["imageStyle"]),
     aspectRatio: str("aspectRatio", base.aspectRatio),
     durationSeconds: Number.isFinite(duration)
       ? Math.min(60, Math.max(5, Math.round(duration)))
