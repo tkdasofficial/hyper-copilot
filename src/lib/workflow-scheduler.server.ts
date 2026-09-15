@@ -50,10 +50,11 @@ type WorkflowRow = {
   run_state: string | null;
   pending_video_id: string | null;
   publish_attempts: number | null;
+  publish_at: string | null;
 };
 
 const SELECT =
-  "id, user_id, name, action_type, trigger_type, caption, hook_title, hashtags, media_url, media_path, targets, repeat_rule, time_slots, scheduled_at, tz_offset, creation_config, run_state, pending_video_id, publish_attempts";
+  "id, user_id, name, action_type, trigger_type, caption, hook_title, hashtags, media_url, media_path, targets, repeat_rule, time_slots, scheduled_at, tz_offset, creation_config, run_state, pending_video_id, publish_attempts, publish_at";
 
 export type SchedulerOutcome = { id: string; outcome: string };
 
