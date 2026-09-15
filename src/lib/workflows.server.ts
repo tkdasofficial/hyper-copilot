@@ -83,6 +83,25 @@ export async function publishTo(
     return String(id);
   };
 
+  if (target.provider === "youtube") {
+    if (!mediaUrl) throw new Error("YouTube needs a video file to upload.");
+    const lines = caption.split("\n").map((line) => line.trim()).filter(Boolean);
+    const title = (lines[0] ?? "New video").replace(/#\S+/g, "").trim() || "New video";
+    const tags = (caption.match(/#[\p{L}\p{N}_]+/gu) ?? []).map((tag) => tag.slice(1));
+    const { callYouTube } = await import("@/lib/youtube.server");
+    const out = await callYouTube<{ videoId: string }>("upload", {
+      refreshToken: token,
+      videoUrl: mediaUrl,
+      title,
+      description: caption,
+      tags,
+      categoryId: "22",
+      privacyStatus: "public",
+      isShort: isVideo,
+    });
+    return out.videoId;
+  }
+
   if (target.provider === "facebook_page") {
     if (isVideo) {
       if (!mediaUrl) throw new Error("A video URL is required for a reel.");
