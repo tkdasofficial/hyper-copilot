@@ -179,10 +179,13 @@ export const setWorkflowEnabled = createServerFn({ method: "POST" })
     if (readError) throw new Error(readError.message);
     if (!workflow) throw new Error("Workflow not found.");
 
-    let nextDueAt: string | null = null;
+    let points: { publishAt: string | null; wakeAt: string | null } = {
+      publishAt: null,
+      wakeAt: null,
+    };
     if (data.enabled && workflow.trigger_type === "schedule") {
-      const { computeNextDueAt } = await import("@/lib/workflows.server");
-      nextDueAt = computeNextDueAt({
+      const { computeSchedulePoints } = await import("@/lib/workflows.server");
+      points = computeSchedulePoints({
         repeat_rule: workflow.repeat_rule,
         time_slots: workflow.time_slots,
         scheduled_at: workflow.scheduled_at,
@@ -191,7 +194,12 @@ export const setWorkflowEnabled = createServerFn({ method: "POST" })
     }
     const { error } = await context.supabase
       .from("workflows")
-      .update({ enabled: data.enabled, next_due_at: nextDueAt, lock_until: null })
+      .update({
+        enabled: data.enabled,
+        next_due_at: points.wakeAt,
+        publish_at: points.publishAt,
+        lock_until: null,
+      })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
