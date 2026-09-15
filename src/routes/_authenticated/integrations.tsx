@@ -35,6 +35,7 @@ function IntegrationsPage() {
   const disconnect = useServerFn(disconnectSocialAccount);
   const queryClient = useQueryClient();
   const { connect, pending, configured } = useMetaConnect();
+  const youtube = useYouTubeConnect();
 
   const connections = useQuery({
     queryKey: ["social-connections"],
@@ -63,7 +64,8 @@ function IntegrationsPage() {
         {PROVIDERS.map((provider) => {
           const Icon = ICONS[provider.id];
           const linked = (connections.data ?? []).filter((c) => c.provider === provider.id);
-          const busy = pending === provider.id;
+          const isYouTube = provider.id === "youtube";
+          const busy = isYouTube ? youtube.pending : pending === provider.id;
 
           return (
             <section
@@ -85,7 +87,7 @@ function IntegrationsPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => connect(provider.id)}
+                  onClick={() => (isYouTube ? youtube.connect() : connect(provider.id))}
                   disabled={busy}
                   aria-label={`Connect ${provider.label}`}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-[12.5px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
