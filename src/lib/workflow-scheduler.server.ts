@@ -140,6 +140,12 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
   let mediaPath = raw.media_path;
 
   try {
+    // 0. Nothing to build: hold a plain post until its exact publish minute.
+    if (!isVideo && !slotReached) {
+      await waitForSlot("waiting");
+      return "waiting-for-slot";
+    }
+
     // 1. Video actions: make sure a finished render exists before publishing.
     if (isVideo) {
       let videoId = raw.pending_video_id;
