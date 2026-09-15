@@ -55,6 +55,11 @@ CAPTIONS = CAPTIONS_RAW in {"1", "true", "yes", "on", "small", "medium", "large"
 CAPTION_SIZE = CAPTIONS_RAW if CAPTIONS_RAW in {"small", "medium", "large"} else "small"
 
 try:
+    CAPTION_SCALE = max(1, min(10, int(float(env("CAPTION_SCALE", "4")))))
+except ValueError:
+    CAPTION_SCALE = 4
+
+try:
     DURATION = max(1, min(60, int(float(env("DURATION_SECONDS", "15")))))
 except ValueError:
     DURATION = 15
@@ -580,7 +585,7 @@ def write_ass(script: str, total: float, path: str = "captions.ass") -> str:
     weight = sum(len(" ".join(c)) for c in cues) or 1
 
     base = CAPTION_SIZES.get(CAPTION_SIZE, CAPTION_SIZES["small"])
-    font_size = max(22, round(HEIGHT * base / 1920))
+    font_size = max(22, round(HEIGHT * base / 1920 * (CAPTION_SCALE / 4)))
     # Alignment 2 = bottom centre; the baseline sits at roughly 88% of the canvas.
     margin_v = max(24, round(HEIGHT * 0.10))
     margin_h = max(40, round(WIDTH * 0.08))

@@ -34,6 +34,7 @@ export type VideoRenderConfig = {
   motion_template: string;
   captions: boolean;
   caption_style: string;
+  caption_scale: number;
   aspect_ratio: string;
   quality: string;
   bitrate: string;
@@ -179,6 +180,7 @@ export async function dispatchVideoRender(admin: Client, videoId: string): Promi
           // GitHub allows 10 client_payload properties, so the captions flag also
           // carries the caption size: false | small | medium | large.
           captions: video.captions ? captionSizeToken(video.caption_style) : "false",
+          caption_scale: String(video.caption_scale ?? 4),
         },
       }),
     });

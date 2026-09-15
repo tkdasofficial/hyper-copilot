@@ -150,6 +150,7 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
           motion_template: "Auto Zoom-In",
           captions: creation.captions,
           caption_style: creation.captionStyle,
+          caption_scale: creation.captionScale,
           aspect_ratio: creation.aspectRatio,
           quality: creation.quality,
           bitrate: "High",

@@ -1,0 +1,1 @@
+ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS caption_scale integer NOT NULL DEFAULT 4;
