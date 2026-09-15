@@ -146,55 +146,13 @@ export async function dispatchVideoRender(admin: Client, videoId: string): Promi
       .eq("user_id", userId);
   };
 
-  // b. repository_dispatch into the external Video Engine repository.
-  const token = (process.env["GITHUB_PAT"] ?? "").trim();
-  if (!token) {
+  // b. Hand the render to the Supabase Edge Function. It owns the Video Engine
+  //    access token (Supabase secret) and performs the repository_dispatch; the
+  //    app only learns whether the hand-off succeeded.
+  const handoff = await invokeRenderDispatch(admin, videoId);
+  if (!handoff.ok) {
     await refund();
-    return fail(
-      `The Video Engine access token is not configured yet. Add the GITHUB_PAT secret with access to ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}.`,
-    );
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(GITHUB_DISPATCH_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type": "application/json",
-        "User-Agent": "hyper-copilot-video-agent",
-      },
-      body: JSON.stringify({
-        event_type: GITHUB_DISPATCH_EVENT,
-        client_payload: {
-          video_id: videoId,
-          user_id: userId,
-          prompt: video.prompt,
-          negative_prompt: video.negative_prompt,
-          voice_gender: video.voice_gender,
-          image_style: video.image_style,
-          aspect_ratio: video.aspect_ratio,
-          duration_seconds: String(video.duration_seconds),
-          // GitHub allows 10 client_payload properties, so the captions flag also
-          // carries the caption size: false | small | medium | large.
-          captions: video.captions ? captionSizeToken(video.caption_style) : "false",
-          caption_scale: String(video.caption_scale ?? 4),
-        },
-      }),
-    });
-  } catch (err) {
-    await refund();
-    return fail(
-      `Could not reach the render pipeline. ${err instanceof Error ? err.message : ""}`.trim(),
-    );
-  }
-
-  if (!res.ok) {
-    const detail = (await res.text()).slice(0, 300);
-    await refund();
-    return fail(`The render pipeline refused the job (${res.status}). ${detail}`);
+    return fail(handoff.error);
   }
 
   await admin
