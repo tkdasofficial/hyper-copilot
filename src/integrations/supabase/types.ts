@@ -510,6 +510,7 @@ export type Database = {
           name: string
           next_due_at: string | null
           pending_video_id: string | null
+          publish_at: string | null
           publish_attempts: number
           repeat_rule: string
           run_state: string
@@ -538,6 +539,7 @@ export type Database = {
           name: string
           next_due_at?: string | null
           pending_video_id?: string | null
+          publish_at?: string | null
           publish_attempts?: number
           repeat_rule?: string
           run_state?: string
@@ -566,6 +568,7 @@ export type Database = {
           name?: string
           next_due_at?: string | null
           pending_video_id?: string | null
+          publish_at?: string | null
           publish_attempts?: number
           repeat_rule?: string
           run_state?: string

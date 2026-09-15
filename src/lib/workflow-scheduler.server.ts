@@ -13,7 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import {
   buildPublishCaption,
-  computeNextDueAt,
+  computeSchedulePoints,
   normalizeCreationConfig,
   publishTo,
   storedAsset,
@@ -50,10 +50,11 @@ type WorkflowRow = {
   run_state: string | null;
   pending_video_id: string | null;
   publish_attempts: number | null;
+  publish_at: string | null;
 };
 
 const SELECT =
-  "id, user_id, name, action_type, trigger_type, caption, hook_title, hashtags, media_url, media_path, targets, repeat_rule, time_slots, scheduled_at, tz_offset, creation_config, run_state, pending_video_id, publish_attempts";
+  "id, user_id, name, action_type, trigger_type, caption, hook_title, hashtags, media_url, media_path, targets, repeat_rule, time_slots, scheduled_at, tz_offset, creation_config, run_state, pending_video_id, publish_attempts, publish_at";
 
 export type SchedulerOutcome = { id: string; outcome: string };
 
@@ -86,20 +87,33 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
   const creation = normalizeCreationConfig(raw.creation_config);
   const isVideo = isVideoAction(raw.action_type as Parameters<typeof isVideoAction>[0]);
 
+  /** The exact moment this run must go out; null means "as soon as ready". */
+  const publishAtMs = raw.publish_at ? new Date(raw.publish_at).getTime() : null;
+  const slotReached = publishAtMs === null || Date.now() >= publishAtMs;
+
+  /** Park the workflow until its publish slot without losing the finished video. */
+  const waitForSlot = async (state: string) => {
+    await admin
+      .from("workflows")
+      .update({ run_state: state, lock_until: null, next_due_at: raw.publish_at })
+      .eq("id", raw.id);
+  };
+
   const reschedule = async (extra: Record<string, unknown> = {}) => {
-    const nextDueAt =
+    const points =
       raw.trigger_type === "schedule"
-        ? computeNextDueAt({
+        ? computeSchedulePoints({
             repeat_rule: raw.repeat_rule,
             time_slots: raw.time_slots,
             scheduled_at: raw.scheduled_at,
             tz_offset: raw.tz_offset ?? 0,
           })
-        : null;
+        : { publishAt: null, wakeAt: null };
     await admin
       .from("workflows")
       .update({
-        next_due_at: nextDueAt,
+        next_due_at: points.wakeAt,
+        publish_at: points.publishAt,
         lock_until: null,
         run_state: "idle",
         pending_video_id: null,
@@ -126,6 +140,12 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
   let mediaPath = raw.media_path;
 
   try {
+    // 0. Nothing to build: hold a plain post until its exact publish minute.
+    if (!isVideo && !slotReached) {
+      await waitForSlot("waiting");
+      return "waiting-for-slot";
+    }
+
     // 1. Video actions: make sure a finished render exists before publishing.
     if (isVideo) {
       let videoId = raw.pending_video_id;
@@ -189,6 +209,12 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
         }
         await admin.from("workflows").update({ lock_until: null }).eq("id", raw.id);
         return "rendering";
+      }
+
+      // Rendered early: keep the finished video and wait for the exact slot.
+      if (!slotReached) {
+        await waitForSlot("ready");
+        return "waiting-for-slot";
       }
 
       const stored = video.video_url;

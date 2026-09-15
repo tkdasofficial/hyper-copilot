@@ -49,7 +49,7 @@ function validate(input: VideoAgentConfig): VideoAgentConfig {
  * Records a Video Agent request as a pending `videos` row — nothing more.
  *
  * The database trigger on that insert hands the row to the server pipeline,
- * which reserves the credit and asks the GitHub Actions render pipeline to
+ * which reserves the credit and asks the external render service to
  * build it. The pipeline writes progress back into the same row, which the
  * page follows over Supabase Realtime. No step depends on this browser session.
  */

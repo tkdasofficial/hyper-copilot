@@ -252,6 +252,28 @@ export function computeNextDueAt(schedule: ScheduleShape, from: Date = new Date(
   return null;
 }
 
+/**
+ * How long before the chosen publish time the pipeline starts creating the
+ * video, so the finished file is already stored when the slot arrives.
+ */
+export const PRERENDER_LEAD_MS = 5 * 60_000;
+
+/**
+ * Turns a schedule into the two timestamps the runner needs:
+ * `publishAt` (the exact moment the post must go out) and `wakeAt`
+ * (5 minutes earlier, when creation starts). A slot that is already less
+ * than 5 minutes away wakes immediately and publishes as soon as it can.
+ */
+export function computeSchedulePoints(
+  schedule: ScheduleShape,
+  from: Date = new Date(),
+): { publishAt: string | null; wakeAt: string | null } {
+  const publishAt = computeNextDueAt(schedule, from);
+  if (!publishAt) return { publishAt: null, wakeAt: null };
+  const wakeMs = Math.max(from.getTime(), new Date(publishAt).getTime() - PRERENDER_LEAD_MS);
+  return { publishAt, wakeAt: new Date(wakeMs).toISOString() };
+}
+
 /* -------------------------------------------------------------------------
  * Caption builder
  *

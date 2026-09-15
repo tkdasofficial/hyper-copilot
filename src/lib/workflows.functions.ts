@@ -123,17 +123,18 @@ export const saveWorkflow = createServerFn({ method: "POST" })
     return { ...input, timeSlots: Array.from(new Set(slots)).sort() };
   })
   .handler(async ({ data, context }): Promise<Workflow> => {
-    const { computeNextDueAt } = await import("@/lib/workflows.server");
+    const { computeSchedulePoints } = await import("@/lib/workflows.server");
 
     const scheduled = data.triggerType === "schedule";
-    const nextDueAt = scheduled
-      ? computeNextDueAt({
+    const points = scheduled
+      ? computeSchedulePoints({
           repeat_rule: data.repeatRule,
           time_slots: data.timeSlots,
           scheduled_at: data.scheduledAt,
           tz_offset: data.tzOffset,
         })
-      : null;
+      : { publishAt: null, wakeAt: null };
+    const nextDueAt = points.wakeAt;
     if (scheduled && data.enabled && !nextDueAt) {
       throw new Error("Choose a future schedule time.");
     }
@@ -152,6 +153,7 @@ export const saveWorkflow = createServerFn({ method: "POST" })
       creation_config: data.creationConfig as never,
       tz_offset: data.tzOffset,
       next_due_at: nextDueAt,
+      publish_at: points.publishAt,
       run_state: "idle",
       publish_attempts: 0,
     };
@@ -177,10 +179,13 @@ export const setWorkflowEnabled = createServerFn({ method: "POST" })
     if (readError) throw new Error(readError.message);
     if (!workflow) throw new Error("Workflow not found.");
 
-    let nextDueAt: string | null = null;
+    let points: { publishAt: string | null; wakeAt: string | null } = {
+      publishAt: null,
+      wakeAt: null,
+    };
     if (data.enabled && workflow.trigger_type === "schedule") {
-      const { computeNextDueAt } = await import("@/lib/workflows.server");
-      nextDueAt = computeNextDueAt({
+      const { computeSchedulePoints } = await import("@/lib/workflows.server");
+      points = computeSchedulePoints({
         repeat_rule: workflow.repeat_rule,
         time_slots: workflow.time_slots,
         scheduled_at: workflow.scheduled_at,
@@ -189,7 +194,12 @@ export const setWorkflowEnabled = createServerFn({ method: "POST" })
     }
     const { error } = await context.supabase
       .from("workflows")
-      .update({ enabled: data.enabled, next_due_at: nextDueAt, lock_until: null })
+      .update({
+        enabled: data.enabled,
+        next_due_at: points.wakeAt,
+        publish_at: points.publishAt,
+        lock_until: null,
+      })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -233,6 +243,8 @@ export const runWorkflowNow = createServerFn({ method: "POST" })
       .update({
         run_state: "requested",
         next_due_at: now,
+        // Manual runs publish as soon as the video is ready.
+        publish_at: null,
         pending_video_id: null,
         publish_attempts: 0,
         lock_until: null,
