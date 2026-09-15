@@ -211,6 +211,12 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
         return "rendering";
       }
 
+      // Rendered early: keep the finished video and wait for the exact slot.
+      if (!slotReached) {
+        await waitForSlot("ready");
+        return "waiting-for-slot";
+      }
+
       const stored = video.video_url;
       if (/^https?:\/\//i.test(stored)) {
         mediaUrl = stored;
