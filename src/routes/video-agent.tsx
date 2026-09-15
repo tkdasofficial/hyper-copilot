@@ -423,6 +423,7 @@ function VideoAgent() {
           motion_template: motion,
           captions,
           caption_style: `White · ${captionSize}`,
+          caption_scale: 4,
           aspect_ratio: ratio,
           quality,
           bitrate,

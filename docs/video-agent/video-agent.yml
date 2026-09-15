@@ -32,7 +32,7 @@ jobs:
       PIXAZO_IMAGE_MODEL: ${{ secrets.PIXAZO_IMAGE_MODEL }}
       VIDEO_ID: ${{ github.event.client_payload.video_id }}
       USER_ID: ${{ github.event.client_payload.user_id }}
-      # Nine flat properties keep repository_dispatch below GitHub's limit.
+      # Ten flat properties keep repository_dispatch at GitHub's limit.
       PROMPT: ${{ github.event.client_payload.prompt }}
       NEGATIVE_PROMPT: ${{ github.event.client_payload.negative_prompt }}
       VOICE_GENDER: ${{ github.event.client_payload.voice_gender }}
@@ -40,6 +40,7 @@ jobs:
       ASPECT_RATIO: ${{ github.event.client_payload.aspect_ratio }}
       DURATION_SECONDS: ${{ github.event.client_payload.duration_seconds }}
       CAPTIONS: ${{ github.event.client_payload.captions }}
+      CAPTION_SCALE: ${{ github.event.client_payload.caption_scale }}
     steps:
       - uses: actions/checkout@v4
 
