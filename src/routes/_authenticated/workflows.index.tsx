@@ -136,15 +136,7 @@ function WorkflowsPage() {
 
   return (
     <StudioLayout>
-      <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-2 sm:pt-4">
-        <div className="mb-3 flex items-center justify-end">
-          <Button asChild size="icon" className="size-10 rounded-full" title="New workflow">
-            <Link to="/workflows/create" aria-label="New workflow">
-              <Plus className="size-4.5" />
-            </Link>
-          </Button>
-        </div>
-
+      <div className="relative mx-auto w-full max-w-3xl px-4 pb-24 pt-2 sm:pt-4">
         {workflows.isLoading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
