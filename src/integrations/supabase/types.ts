@@ -329,6 +329,7 @@ export type Database = {
         Row: {
           aspect_ratio: string
           bitrate: string
+          caption_scale: number
           caption_style: string
           captions: boolean
           created_at: string
@@ -355,6 +356,7 @@ export type Database = {
         Insert: {
           aspect_ratio?: string
           bitrate?: string
+          caption_scale?: number
           caption_style?: string
           captions?: boolean
           created_at?: string
@@ -381,6 +383,7 @@ export type Database = {
         Update: {
           aspect_ratio?: string
           bitrate?: string
+          caption_scale?: number
           caption_style?: string
           captions?: boolean
           created_at?: string
