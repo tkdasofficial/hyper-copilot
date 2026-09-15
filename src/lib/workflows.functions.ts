@@ -153,6 +153,7 @@ export const saveWorkflow = createServerFn({ method: "POST" })
       creation_config: data.creationConfig as never,
       tz_offset: data.tzOffset,
       next_due_at: nextDueAt,
+      publish_at: points.publishAt,
       run_state: "idle",
       publish_attempts: 0,
     };
