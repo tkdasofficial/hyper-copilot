@@ -166,7 +166,8 @@ function WorkflowsPage() {
               ) as SocialProvider[];
               const tone = statusTone(workflow);
               const manual = workflow.triggerType === "manual";
-              const Icon = providers.length === 0 ? Plug : ICONS[providers[0]];
+              const firstProvider = providers[0];
+              const Icon = firstProvider ? ICONS[firstProvider] : Plug;
 
               return (
                 <li
