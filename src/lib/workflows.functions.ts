@@ -243,6 +243,8 @@ export const runWorkflowNow = createServerFn({ method: "POST" })
       .update({
         run_state: "requested",
         next_due_at: now,
+        // Manual runs publish as soon as the video is ready.
+        publish_at: null,
         pending_video_id: null,
         publish_attempts: 0,
         lock_until: null,
