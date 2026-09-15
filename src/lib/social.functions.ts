@@ -34,20 +34,28 @@ function toConnection(row: RawRow): SocialConnection {
   };
 }
 
-/** Reads a secret and strips stray whitespace/quotes left over from pasting. */
-function metaSecret(name: "META_APP_ID" | "META_APP_SECRET" | "META_LOGIN_CONFIG_ID"): string {
-  return (process.env[name] ?? "").trim().replace(/^["']|["']$/g, "");
-}
+type MetaCredentials = { appId: string; appSecret: string; configId: string };
 
-const metaAppId = () => metaSecret("META_APP_ID");
-const metaAppSecret = () => metaSecret("META_APP_SECRET");
-const metaLoginConfigId = () => metaSecret("META_LOGIN_CONFIG_ID");
+/** Reads Meta credentials from the encrypted backend provider store. */
+async function metaCredentials(): Promise<MetaCredentials> {
+  const { providerSecret } = await import("@/lib/provider-secrets.server");
+  const clean = (value: string) => value.trim().replace(/^["']|["']$/g, "");
+  const [appId, appSecret, configId] = await Promise.all([
+    providerSecret("META_APP_ID"),
+    providerSecret("META_APP_SECRET"),
+    providerSecret("META_LOGIN_CONFIG_ID"),
+  ]);
+  return { appId: clean(appId), appSecret: clean(appSecret), configId: clean(configId) };
+}
 
 /** Public Meta app id (safe in the browser) plus whether the server secrets exist. */
 export const getMetaConfig = createServerFn({ method: "GET" }).handler(async () => {
-  const appId = metaAppId();
-  const configId = metaLoginConfigId();
-  return { appId, configId, configured: Boolean(appId && metaAppSecret() && configId) };
+  try {
+    const { appId, appSecret, configId } = await metaCredentials();
+    return { appId, configId, configured: Boolean(appId && appSecret && configId) };
+  } catch {
+    return { appId: "", configId: "", configured: false };
+  }
 });
 
 
@@ -90,10 +98,14 @@ async function graphJson(url: string): Promise<any> {
   return body ? JSON.parse(body) : {};
 }
 
-async function exchangeFacebookCode(code: string, redirectUri: string) {
+async function exchangeFacebookCode(
+  code: string,
+  redirectUri: string,
+  credentials: MetaCredentials,
+) {
   const params = new URLSearchParams({
-    client_id: metaAppId(),
-    client_secret: metaAppSecret(),
+    client_id: credentials.appId,
+    client_secret: credentials.appSecret,
     redirect_uri: redirectUri,
     code,
   });
@@ -101,8 +113,8 @@ async function exchangeFacebookCode(code: string, redirectUri: string) {
   // Upgrade to a long-lived (~60 day) user token.
   const longParams = new URLSearchParams({
     grant_type: "fb_exchange_token",
-    client_id: metaAppId(),
-    client_secret: metaAppSecret(),
+    client_id: credentials.appId,
+    client_secret: credentials.appSecret,
     fb_exchange_token: short.access_token,
   });
   const long = await graphJson(`${GRAPH}/oauth/access_token?${longParams.toString()}`);
@@ -112,13 +124,17 @@ async function exchangeFacebookCode(code: string, redirectUri: string) {
   };
 }
 
-async function exchangeThreadsCode(code: string, redirectUri: string) {
+async function exchangeThreadsCode(
+  code: string,
+  redirectUri: string,
+  credentials: MetaCredentials,
+) {
   const res = await fetch(`${THREADS_GRAPH}/oauth/access_token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: metaAppId(),
-      client_secret: metaAppSecret(),
+      client_id: credentials.appId,
+      client_secret: credentials.appSecret,
       grant_type: "authorization_code",
       redirect_uri: redirectUri,
       code,
@@ -131,7 +147,7 @@ async function exchangeThreadsCode(code: string, redirectUri: string) {
   try {
     const long = await graphJson(
       `${THREADS_GRAPH}/access_token?grant_type=th_exchange_token&client_secret=${encodeURIComponent(
-        metaAppSecret(),
+        credentials.appSecret,
       )}&access_token=${encodeURIComponent(json.access_token)}`,
     );
     return { token: long.access_token as string, expiresIn: Number(long.expires_in ?? 0) };
@@ -251,6 +267,7 @@ async function discoverAccounts(
 async function explainEmptyDiscovery(
   provider: SocialProvider,
   userToken: string,
+  credentials: MetaCredentials,
 ): Promise<string> {
   const token = encodeURIComponent(userToken);
   let granted: string[] = [];
@@ -274,7 +291,7 @@ async function explainEmptyDiscovery(
   }
 
   try {
-    const appToken = `${metaAppId()}|${metaAppSecret()}`;
+    const appToken = `${credentials.appId}|${credentials.appSecret}`;
     const debug = await graphJson(
       `${GRAPH}/debug_token?input_token=${token}&access_token=${encodeURIComponent(appToken)}`,
     );
@@ -308,10 +325,11 @@ export const completeMetaConnection = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    if (!metaAppId() || !metaAppSecret()) {
+    const credentials = await metaCredentials();
+    if (!credentials.appId || !credentials.appSecret) {
       throw new Error("Meta app credentials are not configured on the server.");
     }
-    if (data.provider !== "threads" && !metaLoginConfigId()) {
+    if (data.provider !== "threads" && !credentials.configId) {
       throw new Error(
         "Facebook Login for Business is not configured. Add the Login Configuration ID from the Meta app dashboard.",
       );
@@ -319,12 +337,15 @@ export const completeMetaConnection = createServerFn({ method: "POST" })
 
     const { token, expiresIn } =
       data.provider === "threads"
-        ? await exchangeThreadsCode(data.code, data.redirectUri)
-        : await exchangeFacebookCode(data.code, data.redirectUri);
+        ? await exchangeThreadsCode(data.code, data.redirectUri, credentials)
+        : await exchangeFacebookCode(data.code, data.redirectUri, credentials);
 
     const accounts = await discoverAccounts(data.provider, token);
     if (accounts.length === 0) {
-      return { linked: 0, message: await explainEmptyDiscovery(data.provider, token) };
+      return {
+        linked: 0,
+        message: await explainEmptyDiscovery(data.provider, token, credentials),
+      };
     }
 
 
