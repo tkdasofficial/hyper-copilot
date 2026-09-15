@@ -6,7 +6,6 @@ import {
   type SocialConnection,
   type SocialProvider,
 } from "@/lib/social.shared";
-import { providerSecret } from "@/lib/provider-secrets.server";
 
 const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const THREADS_GRAPH = "https://graph.threads.net";
@@ -39,6 +38,7 @@ type MetaCredentials = { appId: string; appSecret: string; configId: string };
 
 /** Reads Meta credentials from the encrypted backend provider store. */
 async function metaCredentials(): Promise<MetaCredentials> {
+  const { providerSecret } = await import("@/lib/provider-secrets.server");
   const clean = (value: string) => value.trim().replace(/^["']|["']$/g, "");
   const [appId, appSecret, configId] = await Promise.all([
     providerSecret("META_APP_ID"),
