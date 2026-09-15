@@ -13,7 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import {
   buildPublishCaption,
-  computeNextDueAt,
+  computeSchedulePoints,
   normalizeCreationConfig,
   publishTo,
   storedAsset,
