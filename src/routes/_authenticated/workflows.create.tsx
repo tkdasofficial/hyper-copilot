@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AtSign, CalendarDays, Check, ChevronDown, Facebook, Instagram, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { AtSign, CalendarDays, Check, ChevronDown, Facebook, Instagram, Loader2, Plus, Sparkles, X, Youtube } from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { StudioLayout } from "@/components/hyper/StudioLayout";
@@ -58,6 +58,7 @@ const ICONS: Record<SocialProvider, typeof Facebook> = {
   facebook_page: Facebook,
   instagram: Instagram,
   threads: AtSign,
+  youtube: Youtube,
 };
 
 const inputClass =

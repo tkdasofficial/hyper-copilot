@@ -3,7 +3,7 @@
 import { ART_STYLES, IMAGE_STYLES } from "@/lib/style-presets";
 export { ART_STYLES, IMAGE_STYLES } from "@/lib/style-presets";
 
-export type SocialProvider = "facebook_page" | "instagram" | "threads";
+export type SocialProvider = "facebook_page" | "instagram" | "threads" | "youtube";
 
 export type ProviderInfo = {
   id: SocialProvider;
@@ -51,7 +51,20 @@ export const PROVIDERS: ProviderInfo[] = [
     scopes: ["threads_basic", "threads_content_publish"],
     authorizeUrl: "https://threads.net/oauth/authorize",
   },
+  {
+    id: "youtube",
+    label: "YouTube",
+    description: "Upload videos and Shorts to your YouTube channel.",
+    scopes: [
+      "https://www.googleapis.com/auth/youtube.upload",
+      "https://www.googleapis.com/auth/youtube.readonly",
+    ],
+    authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  },
 ];
+
+/** Providers handled by the Meta consent flow (everything else has its own). */
+export const META_PROVIDERS: SocialProvider[] = ["facebook_page", "instagram", "threads"];
 
 export function providerInfo(id: SocialProvider): ProviderInfo {
   const found = PROVIDERS.find((p) => p.id === id);
