@@ -25,6 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { CAPTION_TEMPLATES } from "@/lib/social.shared";
 
 export const Route = createFileRoute("/video-agent")({
   head: () =>
@@ -76,8 +78,6 @@ const motionTemplates = [
   "Dynamic Keyframe",
   "Fade Transitions",
 ] as const;
-/** Captions are always clean white text; only the size is selectable. */
-const captionSizes = ["Small", "Medium", "Large"] as const;
 const ratios = ["9:16", "16:9"] as const;
 const ratioLabels: Record<(typeof ratios)[number], string> = {
   "9:16": "Shorts / Reels",
@@ -267,7 +267,10 @@ function VideoAgent() {
   const [motion, setMotion] = useState<(typeof motionTemplates)[number]>("Auto Zoom-In");
 
   const [captions, setCaptions] = useState(true);
-  const [captionSize, setCaptionSize] = useState<(typeof captionSizes)[number]>("Small");
+  const [captionTemplate, setCaptionTemplate] = useState<(typeof CAPTION_TEMPLATES)[number]>(
+    CAPTION_TEMPLATES[0],
+  );
+  const [captionScale, setCaptionScale] = useState(4);
 
   const [ratio, setRatio] = useState<(typeof ratios)[number]>("9:16");
   const [quality, setQuality] = useState<(typeof qualities)[number]>("1080p");
@@ -399,7 +402,7 @@ function VideoAgent() {
       log(`theme: ${activeTheme.name} · humanless visuals enforced`);
       log(`visuals: ${artStyle} · ${imageStyle} · motion ${motion}`);
       log(
-        captions ? `captions: ON · white · ${captionSize}` : "captions: OFF",
+        captions ? `captions: ON · ${captionTemplate} · size ${captionScale}` : "captions: OFF",
         captions ? undefined : "warn",
       );
       log(`encoder: ${quality} · ${bitrate} bitrate`);
@@ -422,8 +425,8 @@ function VideoAgent() {
           image_style: `${artStyle} · ${imageStyle}`,
           motion_template: motion,
           captions,
-          caption_style: `White · ${captionSize}`,
-          caption_scale: 4,
+          caption_style: captionTemplate,
+          caption_scale: captionScale,
           aspect_ratio: ratio,
           quality,
           bitrate,
@@ -559,19 +562,43 @@ function VideoAgent() {
           <SliderRow label="Pitch" value={pitch} onChange={setPitch} suffix="%" />
         </Panel>
 
-        <Panel title="Captions" summary={captions ? `White · ${captionSize}` : "Off"}>
+        <Panel title="Captions" summary={captions ? `${captionTemplate} · ${captionScale}` : "Off"}>
           <SwitchRow
             label="Captions"
             checked={captions}
             onCheckedChange={setCaptions}
           />
+          <SelectRow
+            label="Caption template"
+            value={captionTemplate}
+            options={CAPTION_TEMPLATES}
+            onChange={setCaptionTemplate}
+          />
           {captions ? (
-            <Segment
-              label="Font size"
-              options={captionSizes}
-              value={captionSize}
-              onChange={setCaptionSize}
-            />
+            <div className="space-y-3 rounded-2xl border border-border p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Caption size</span>
+                <span className="text-xs font-bold tabular-nums">{captionScale}</span>
+              </div>
+              <Slider
+                value={[captionScale]}
+                onValueChange={([value]) =>
+                  setCaptionScale(Math.min(10, Math.max(1, Math.round(value ?? 4))))
+                }
+                min={1}
+                max={10}
+                step={1}
+                aria-label="Caption size"
+              />
+              <div className="flex items-center justify-center rounded-xl border border-border bg-background p-4">
+                <span
+                  className="font-bold uppercase tracking-wide"
+                  style={{ fontSize: `${10 + captionScale * 5}px`, lineHeight: 1.2 }}
+                >
+                  CAPTION TEXT
+                </span>
+              </div>
+            </div>
           ) : null}
         </Panel>
 
