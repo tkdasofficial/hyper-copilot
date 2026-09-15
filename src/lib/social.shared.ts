@@ -103,6 +103,7 @@ export type CreationConfig = {
   voiceTone: string;
   captions: boolean;
   captionStyle: string;
+  captionScale: number;
   quality: string;
 };
 
@@ -157,6 +158,7 @@ export function defaultCreationConfig(): CreationConfig {
     voiceTone: "Neutral",
     captions: true,
     captionStyle: "Neon Glow",
+    captionScale: 4,
     quality: "1080p",
   };
 }

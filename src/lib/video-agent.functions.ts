@@ -12,6 +12,7 @@ export type VideoAgentConfig = {
   motion_template: string;
   captions: boolean;
   caption_style: string;
+  caption_scale: number;
   aspect_ratio: string;
   quality: string;
   bitrate: string;
@@ -23,6 +24,7 @@ function validate(input: VideoAgentConfig): VideoAgentConfig {
     throw new Error("A prompt is required");
   }
   const duration = Math.round(Number(input.duration_seconds ?? 15));
+  const scale = Math.round(Number(input.caption_scale ?? 4));
   return {
     duration_seconds: Math.min(60, Math.max(1, Number.isFinite(duration) ? duration : 15)),
     prompt: input.prompt.trim().slice(0, 4000),
@@ -35,6 +37,7 @@ function validate(input: VideoAgentConfig): VideoAgentConfig {
     motion_template: String(input.motion_template ?? "Auto Zoom-In"),
     captions: Boolean(input.captions),
     caption_style: String(input.caption_style ?? "Neon Glow"),
+    caption_scale: Math.min(10, Math.max(1, Number.isFinite(scale) ? scale : 4)),
     aspect_ratio: input.aspect_ratio === "16:9" ? "16:9" : "9:16",
     quality: input.quality === "720p" ? "720p" : "1080p",
     bitrate: input.bitrate === "Standard" ? "Standard" : "High",

@@ -173,6 +173,7 @@ export function normalizeCreationConfig(raw: unknown): CreationConfig {
   const str = (key: keyof CreationConfig, fallback: string) =>
     typeof value[key] === "string" && value[key] ? String(value[key]) : fallback;
   const duration = Number(value["durationSeconds"]);
+  const scale = Number(value["captionScale"]);
   return {
     instructions: str("instructions", base.instructions),
     category: str("category", base.category),
@@ -187,6 +188,9 @@ export function normalizeCreationConfig(raw: unknown): CreationConfig {
     voiceTone: str("voiceTone", base.voiceTone),
     captions: typeof value["captions"] === "boolean" ? value["captions"] : base.captions,
     captionStyle: str("captionStyle", base.captionStyle),
+    captionScale: Number.isFinite(scale)
+      ? Math.min(10, Math.max(1, Math.round(scale)))
+      : base.captionScale,
     quality: str("quality", base.quality),
   };
 }
