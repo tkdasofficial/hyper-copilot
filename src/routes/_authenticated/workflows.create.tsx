@@ -540,6 +540,30 @@ function CreateWorkflowPage() {
                 <span className="text-sm font-semibold">Captions</span>
                 <Toggle checked={creation.captions} onChange={(captions) => setCreation({ ...creation, captions })} label={creation.captions ? "On" : "Off"} />
               </div>
+              <div className="space-y-3 rounded-2xl border border-border p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Caption size</span>
+                  <span className="text-xs font-bold tabular-nums">{creation.captionScale}</span>
+                </div>
+                <Slider
+                  value={[creation.captionScale]}
+                  onValueChange={([value]) =>
+                    setCreation({ ...creation, captionScale: Math.min(10, Math.max(1, Math.round(value ?? 4))) })
+                  }
+                  min={1}
+                  max={10}
+                  step={1}
+                  aria-label="Caption size"
+                />
+                <div className="flex items-center justify-center rounded-xl border border-border bg-background p-4">
+                  <span
+                    className="font-bold uppercase tracking-wide"
+                    style={{ fontSize: `${10 + creation.captionScale * 5}px`, lineHeight: 1.2 }}
+                  >
+                    CAPTION TEXT
+                  </span>
+                </div>
+              </div>
               <Button
                 type="button"
                 onClick={() => setCustomizing(false)}
