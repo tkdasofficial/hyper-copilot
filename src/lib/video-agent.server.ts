@@ -45,12 +45,46 @@ type Client = SupabaseClient<Database>;
 export const RENDER_STEP_QUEUED = "queued";
 const RENDER_STEP_DISPATCHING = "dispatching";
 
-/** Captions are always white; the style string only carries the font size. */
-function captionSizeToken(captionStyle: string): "small" | "medium" | "large" {
-  const value = (captionStyle ?? "").toLowerCase();
-  if (value.includes("large")) return "large";
-  if (value.includes("medium")) return "medium";
-  return "small";
+/**
+ * Asks the Supabase Edge Function to dispatch a render.
+ *
+ * The app never sees or stores the Video Engine credential: it authenticates
+ * with the backend worker token and reads back only ok / error.
+ */
+async function invokeRenderDispatch(
+  admin: Client,
+  videoId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: runner } = await admin
+    .from("job_runner")
+    .select("worker_token")
+    .eq("id", "default")
+    .maybeSingle();
+  const workerSecret = (runner?.worker_token ?? "").trim();
+  if (!workerSecret) {
+    return { ok: false, error: "The backend worker credential is not configured yet." };
+  }
+
+  try {
+    const res = await fetch(RENDER_DISPATCH_FUNCTION, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-worker-secret": workerSecret },
+      body: JSON.stringify({ action: "dispatch", videoId }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || payload.ok !== true) {
+      return {
+        ok: false,
+        error: payload.error ?? `The render service refused the job (${res.status}).`,
+      };
+    }
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Could not reach the render service. ${err instanceof Error ? err.message : ""}`.trim(),
+    };
+  }
 }
 
 async function readCredits(supabase: Client, userId: string) {
