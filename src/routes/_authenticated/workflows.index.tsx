@@ -280,6 +280,17 @@ function WorkflowsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Button
+        asChild
+        size="icon"
+        className="fixed bottom-6 right-6 z-50 size-12 rounded-full shadow-lg"
+        title="New workflow"
+      >
+        <Link to="/workflows/create" aria-label="New workflow">
+          <Plus className="size-5" />
+        </Link>
+      </Button>
     </StudioLayout>
   );
 }
