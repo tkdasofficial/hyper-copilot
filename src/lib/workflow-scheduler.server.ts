@@ -87,20 +87,33 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
   const creation = normalizeCreationConfig(raw.creation_config);
   const isVideo = isVideoAction(raw.action_type as Parameters<typeof isVideoAction>[0]);
 
+  /** The exact moment this run must go out; null means "as soon as ready". */
+  const publishAtMs = raw.publish_at ? new Date(raw.publish_at).getTime() : null;
+  const slotReached = publishAtMs === null || Date.now() >= publishAtMs;
+
+  /** Park the workflow until its publish slot without losing the finished video. */
+  const waitForSlot = async (state: string) => {
+    await admin
+      .from("workflows")
+      .update({ run_state: state, lock_until: null, next_due_at: raw.publish_at })
+      .eq("id", raw.id);
+  };
+
   const reschedule = async (extra: Record<string, unknown> = {}) => {
-    const nextDueAt =
+    const points =
       raw.trigger_type === "schedule"
-        ? computeNextDueAt({
+        ? computeSchedulePoints({
             repeat_rule: raw.repeat_rule,
             time_slots: raw.time_slots,
             scheduled_at: raw.scheduled_at,
             tz_offset: raw.tz_offset ?? 0,
           })
-        : null;
+        : { publishAt: null, wakeAt: null };
     await admin
       .from("workflows")
       .update({
-        next_due_at: nextDueAt,
+        next_due_at: points.wakeAt,
+        publish_at: points.publishAt,
         lock_until: null,
         run_state: "idle",
         pending_video_id: null,
