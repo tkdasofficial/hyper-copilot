@@ -1,5 +1,8 @@
 /** Shared (browser-safe) metadata for the Meta social integrations. */
 
+import { ART_STYLES, IMAGE_STYLES } from "@/lib/style-presets";
+export { ART_STYLES, IMAGE_STYLES } from "@/lib/style-presets";
+
 export type SocialProvider = "facebook_page" | "instagram" | "threads";
 
 export type ProviderInfo = {
@@ -113,20 +116,6 @@ export const CREATION_CATEGORIES = [
   "Ocean & Sky",
   "Micro World",
 ] as const;
-export const ART_STYLES = [
-  "Cinematic Realism",
-  "Anime / Manga",
-  "3D Animated",
-  "Dark Fantasy",
-  "Retro VHS",
-] as const;
-export const IMAGE_STYLES = [
-  "Cosmic Realism",
-  "Cinematic Nature",
-  "Macro Micro-Detail",
-  "Aerial Landscape",
-  "Dreamy Painterly",
-] as const;
 export const VOICE_GENDERS = ["Male", "Female"] as const;
 export const VOICE_PERSONAS = [
   "Cosmic Documentary",
@@ -149,8 +138,8 @@ export function defaultCreationConfig(): CreationConfig {
   return {
     instructions: "",
     category: "Cosmic Universe",
-    artStyle: "Cinematic Realism",
-    imageStyle: "Cosmic Realism",
+    artStyle: ART_STYLES[0],
+    imageStyle: IMAGE_STYLES[0],
     aspectRatio: "9:16",
     durationSeconds: 20,
     voiceGender: "Male",

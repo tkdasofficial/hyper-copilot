@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { uploadReference } from "@/lib/generation.functions";
 import { runJob } from "@/lib/jobs-runner";
+import { IMAGE_STYLES, imageStylePrompt } from "@/lib/style-presets";
 import {
   MAX_SELECTABLE_VIDEO_DURATION,
   SPEECH_TONES,
@@ -83,16 +84,15 @@ const ratios = [
   { label: "21:9", note: "Cinematic", w: 21, h: 9 },
 ];
 
-const styles = [
-  { id: "heaven", name: "HEAVEN", note: "Signature spinal style", signature: true },
-  { id: "none", name: "None", note: "Model default" },
-  { id: "photo", name: "Photographic", note: "Realistic lensing" },
-  { id: "cinematic", name: "Cinematic", note: "Filmic grade" },
-  { id: "anime", name: "Anime", note: "Cel shaded" },
-  { id: "3d", name: "3D Render", note: "Studio CGI" },
-  { id: "line", name: "Line Art", note: "Single stroke" },
-  { id: "noir", name: "Noir", note: "High contrast B&W" },
-];
+const styleNotes: Record<(typeof IMAGE_STYLES)[number], string> = {
+  Photorealistic: "Natural, true-to-life photography",
+  "Cinematic Film": "Balanced framing with subtle grain",
+  "Studio Photography": "Controlled professional lighting",
+  "Digital Art": "Clean forms and balanced color",
+  "3D Animation": "Polished dimensional rendering",
+  "Vintage Kodak": "Authentic film color and grain",
+};
+const styles = IMAGE_STYLES.map((name) => ({ id: name, name, note: styleNotes[name] }));
 
 const advancedModes = [
   { id: "reference", name: "Reference", note: "Match subject from an image" },
@@ -334,8 +334,7 @@ export function PromptComposer() {
     return uploaded.map((u) => u.url).filter((u): u is string => !!u);
   };
 
-  const promptWithStyle = (prompt: string) =>
-    style.name && style.name !== "None" ? `${prompt}. ${style.name} style` : prompt;
+  const promptWithStyle = (prompt: string) => `${prompt}. ${imageStylePrompt(style.name)}`;
 
   const generate = async () => {
     if (!value.trim()) {

@@ -9,6 +9,7 @@ import { Panel, RatioBlocks, Segment, SliderRow, SwitchRow, TextRow } from "@/co
 import { RecentCreations } from "@/components/hyper/RecentCreations";
 import { uploadReference } from "@/lib/generation.functions";
 import { runJob } from "@/lib/jobs-runner";
+import { IMAGE_STYLES, imageStylePrompt } from "@/lib/style-presets";
 import {
   MAX_SELECTABLE_VIDEO_DURATION,
   VIDEO_DURATIONS,
@@ -51,7 +52,7 @@ const lockedDurations = VIDEO_DURATIONS.filter((d) => d > MAX_SELECTABLE_VIDEO_D
 ) as unknown as readonly string[];
 const frameRates = VIDEO_FPS.map((f) => `${f} fps`) as unknown as readonly string[];
 const cameraMoves = ["Static", "Pan", "Tilt", "Dolly In", "Dolly Out", "Orbit", "Crane", "Handheld"] as const;
-const styles = ["Cinematic", "Photoreal", "Anime", "3D Render", "Documentary", "Neon Noir"] as const;
+const styles = IMAGE_STYLES;
 
 type FrameSlot = "start" | "end";
 type FrameFile = { name: string; previewUrl: string; dataUrl: string };
@@ -170,7 +171,7 @@ function VideoStudio() {
       );
 
       const out = await runJob("video", prompt.trim(), {
-        prompt: `${prompt.trim()}, ${style.toLowerCase()} look (${styleStrength}% style), ${camera.toLowerCase()} camera move, ${motion > 65 ? "high" : motion < 35 ? "subtle" : "moderate"} motion`,
+        prompt: `${prompt.trim()}, ${imageStylePrompt(style)}, ${styleStrength}% style influence, ${camera.toLowerCase()} camera move, ${motion > 65 ? "high" : motion < 35 ? "subtle" : "moderate"} motion`,
         negative: negative.trim(),
         aspect: ratio,
         resolution: res,

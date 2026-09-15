@@ -42,7 +42,7 @@ def env(name: str, default: str = "") -> str:
 PROMPT = env("PROMPT")
 NEGATIVE_PROMPT = env("NEGATIVE_PROMPT")
 VOICE_GENDER = env("VOICE_GENDER", "female").lower()
-IMAGE_STYLE = env("IMAGE_STYLE", "Cinematic Realism")
+IMAGE_STYLE = env("IMAGE_STYLE", "realistic photography with natural colors, lit by natural sunlight")
 MOTION_TEMPLATE = env("MOTION_TEMPLATE", "Auto Zoom-In")
 ASPECT_RATIO = env("ASPECT_RATIO", "9:16")
 QUALITY = env("QUALITY", "1080p")
@@ -193,15 +193,13 @@ def word_window(duration: int) -> tuple[int, int, int]:
 WORD_MIN, WORD_TARGET, WORD_MAX = word_window(DURATION)
 
 NATURE_STYLE_PREFIX = (
-    "breathtaking humanless nature and cosmic scenery, planets, nebulae, starfields, "
-    "mountains, oceans, forests, macro micro-details, natural textures, volumetric light, "
-    "ultra detailed, no people"
+    "humanless scenery with realistic composition, natural textures and believable light, no people"
 )
 HUMANLESS_NEGATIVE = "human, person, face, character, crowd, watermark, text"
 
 
 def image_prompt(scene_prompt: str) -> str:
-    """Humanless nature/cosmic prompt builder shared by every image provider."""
+    """Humanless scene prompt builder shared by every image provider."""
     return f"{NATURE_STYLE_PREFIX}, {scene_prompt}, {IMAGE_STYLE}"[:1900]
 
 
@@ -352,7 +350,7 @@ def write_script() -> tuple[str, list[str]]:
 
     script = clean_script(
         cf_chat(
-            "You are a narrator for humanless nature and cosmic short films. "
+            "You are a narrator for short visual stories without human characters. "
             "Reply with the narration sentences only — no titles, labels, lists or notes.",
             f"Topic: {PROMPT}\n"
             f"Write flowing narration of about {WORD_TARGET} words (between {WORD_MIN} and "
@@ -374,8 +372,8 @@ def write_script() -> tuple[str, list[str]]:
             f"Story: {script}\n"
             f"Write exactly {SCENE_COUNT} distinct image prompts in the '{IMAGE_STYLE}' style "
             "covering different moments of this story. Each prompt is one line, 15-30 words, "
-            "showing nature, cosmic space, planets, oceans or micro-detail scenery only — "
-            "never humans, faces, characters or text.\n"
+            "showing clear, believable scenery that follows the story — never humans, faces, "
+            "characters or text.\n"
             f"Avoid: {NEGATIVE_PROMPT or 'nothing in particular'}.",
             max_tokens=700,
         )

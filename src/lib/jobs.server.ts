@@ -9,6 +9,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { JobKind, JobResult } from "@/lib/jobs.shared";
+import { imageStylePrompt } from "@/lib/style-presets";
 
 export type JobRow = {
   id: string;
@@ -66,14 +67,12 @@ export async function runImage(
   const referenceModes = (data.referenceModes ?? []).filter(Boolean);
   const finalPrompt = [
     data.prompt.trim(),
-    style && style.toLowerCase() !== "none"
-      ? `${style} visual style, style influence ${styleStrength} percent`
-      : "",
+    style ? `${imageStylePrompt(style)}, style influence ${styleStrength} percent` : "",
     refs.length && referenceModes.length
       ? `Use the supplied image as ${referenceModes.join(", ").toLowerCase()} guidance with ${Math.max(0, Math.min(100, data.referenceWeight ?? 50))} percent influence`
       : "",
     `compose strictly for a ${aspect} canvas`,
-    data.resolution ? `${data.resolution} high-detail output` : "",
+    data.resolution ? `${data.resolution} output` : "",
     data.negativePrompt?.trim()
       ? `Exclude all of the following from the image: ${data.negativePrompt.trim()}`
       : "",

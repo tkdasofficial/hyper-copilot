@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { visualStylePrompt } from "@/lib/style-presets";
 
 export type VideoAgentConfig = {
   prompt: string;
@@ -33,7 +34,7 @@ function validate(input: VideoAgentConfig): VideoAgentConfig {
     voice_persona: String(input.voice_persona ?? "Cinematic Narrator"),
     voice_speed: Number(input.voice_speed ?? 110),
     voice_pitch: Number(input.voice_pitch ?? 52),
-    image_style: String(input.image_style ?? "Cinematic 3D"),
+    image_style: String(input.image_style ?? visualStylePrompt("Photorealistic", "Natural Sunlight")),
     motion_template: String(input.motion_template ?? "Auto Zoom-In"),
     captions: Boolean(input.captions),
     caption_style: String(input.caption_style ?? "Neon Glow"),

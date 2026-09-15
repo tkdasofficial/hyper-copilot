@@ -20,6 +20,7 @@ import {
 } from "@/lib/workflows.server";
 import { isVideoAction } from "@/lib/social.shared";
 import { createVideoRequest } from "@/lib/video-agent.server";
+import { visualStylePrompt } from "@/lib/style-presets";
 
 type Admin = SupabaseClient<Database>;
 
@@ -146,7 +147,7 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
           voice_persona: creation.voicePersona,
           voice_speed: 110,
           voice_pitch: 52,
-          image_style: `${creation.imageStyle} · ${creation.artStyle}`,
+          image_style: visualStylePrompt(creation.imageStyle, creation.artStyle),
           motion_template: "Auto Zoom-In",
           captions: creation.captions,
           caption_style: creation.captionStyle,

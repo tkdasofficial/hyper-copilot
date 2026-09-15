@@ -10,6 +10,7 @@ import { RecentCreations } from "@/components/hyper/RecentCreations";
 import { Button } from "@/components/ui/button";
 import { uploadReference } from "@/lib/generation.functions";
 import { runJob } from "@/lib/jobs-runner";
+import { IMAGE_STYLES } from "@/lib/style-presets";
 
 export const Route = createFileRoute("/image")({
   head: () =>
@@ -42,7 +43,7 @@ export const Route = createFileRoute("/image")({
 
 const ratios = ["1:1", "4:5", "3:2", "16:9", "9:16", "21:9", "2:3", "3:4", "5:4"] as const;
 const resolutions = ["1K", "2K", "4K", "8K"] as const;
-const styles = ["HEAVEN", "Photoreal", "Cinematic", "Anime", "3D Render", "Line Art", "Neon Noir"] as const;
+const styles = IMAGE_STYLES;
 const refModes = ["Reference", "Transform", "Composition", "Palette", "Character", "Inpaint", "Depth", "Pose"];
 
 function ImageStudio() {
