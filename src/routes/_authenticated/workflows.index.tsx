@@ -2,12 +2,38 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AtSign, Facebook, Instagram, Loader2, Play, Plug, Plus, Settings, Trash2 } from "lucide-react";
+import {
+  AtSign,
+  Facebook,
+  Instagram,
+  Loader2,
+  MoreVertical,
+  Play,
+  Plug,
+  Plus,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { StudioLayout } from "@/components/hyper/StudioLayout";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { listSocialConnections } from "@/lib/social.functions";
 import {
   deleteWorkflow,
@@ -15,12 +41,7 @@ import {
   runWorkflowNow,
   setWorkflowEnabled,
 } from "@/lib/workflows.functions";
-import {
-  ACTION_LABELS,
-  REPEAT_LABELS,
-  TRIGGER_LABELS,
-  type SocialProvider,
-} from "@/lib/social.shared";
+import { type SocialProvider } from "@/lib/social.shared";
 
 export const Route = createFileRoute("/_authenticated/workflows/")({
   head: () =>
@@ -41,30 +62,27 @@ const ICONS: Record<SocialProvider, typeof Facebook> = {
   threads: AtSign,
 };
 
-/** Plain-language status line for a workflow card. */
-function activityOf(workflow: {
+type StatusTone = "active" | "error" | "disabled" | "processing";
+
+function statusTone(workflow: {
   runState: string;
   lastRunStatus: string | null;
-  lastRunAt: string | null;
-  nextDueAt: string | null;
-  triggerType: string;
   enabled: boolean;
-}): string {
-  if (workflow.runState === "requested") return "Starting…";
-  if (workflow.runState === "rendering") return "Creating the video…";
-  if (workflow.runState === "retry") return "Publishing failed — retrying";
-  if (workflow.lastRunStatus === "completed") return "Last run published";
-  if (workflow.lastRunStatus === "failed") return "Last run failed";
-  if (workflow.enabled && workflow.triggerType === "schedule" && workflow.nextDueAt) {
-    return `Next run ${new Date(workflow.nextDueAt).toLocaleString(undefined, {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
+}): StatusTone {
+  if (workflow.runState === "requested" || workflow.runState === "rendering" || workflow.runState === "retry") {
+    return "processing";
   }
-  return "";
+  if (workflow.lastRunStatus === "failed") return "error";
+  if (!workflow.enabled) return "disabled";
+  return "active";
 }
+
+const STATUS_RING: Record<StatusTone, string> = {
+  active: "border-emerald-500",
+  error: "border-red-500",
+  disabled: "border-border",
+  processing: "border-amber-500",
+};
 
 function WorkflowsPage() {
   const fetchWorkflows = useServerFn(listWorkflows);
@@ -78,7 +96,6 @@ function WorkflowsPage() {
   const workflows = useQuery({
     queryKey: ["workflows"],
     queryFn: () => fetchWorkflows(),
-    // While a run is generating or retrying, keep the card status fresh.
     refetchInterval: (query) =>
       (query.state.data ?? []).some((w) => w.runState && w.runState !== "idle") ? 15_000 : false,
   });
@@ -88,6 +105,8 @@ function WorkflowsPage() {
   });
 
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [deletingWorkflow, setDeletingWorkflow] = useState<{ id: string; name: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
 
   const providerOf = useMemo(() => {
     const map = new Map<string, SocialProvider>();
@@ -100,6 +119,20 @@ function WorkflowsPage() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["workflows"] });
 
   const items = workflows.data ?? [];
+
+  const confirmDelete = async () => {
+    if (!deletingWorkflow) return;
+    try {
+      await remove({ data: { id: deletingWorkflow.id } });
+      toast.success("Workflow deleted");
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingWorkflow(null);
+      setDeleteConfirm("");
+    }
+  };
 
   return (
     <StudioLayout>
@@ -120,93 +153,38 @@ function WorkflowsPage() {
           <div className="rounded-3xl border border-border bg-surface p-8 text-center">
             <p className="text-sm text-muted-foreground">No workflows yet.</p>
             <div className="mt-4 flex justify-center gap-2">
-              <Button asChild><Link to="/workflows/create">Create workflow</Link></Button>
+              <Button asChild>
+                <Link to="/workflows/create">Create workflow</Link>
+              </Button>
             </div>
           </div>
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="space-y-2">
             {items.map((workflow) => {
               const providers = Array.from(
                 new Set(workflow.targets.map((id) => providerOf.get(id)).filter(Boolean)),
               ) as SocialProvider[];
+              const tone = statusTone(workflow);
               const manual = workflow.triggerType === "manual";
+              const Icon = providers.length === 0 ? Plug : ICONS[providers[0]];
+
               return (
                 <li
                   key={workflow.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-surface p-3"
+                  className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5"
                 >
+                  <div
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-full border-2 bg-muted ${STATUS_RING[tone]}`}
+                    title={tone}
+                  >
+                    <Icon className="size-4 text-muted-foreground" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-semibold">{workflow.name}</p>
+                  </div>
+
                   <div className="flex shrink-0 items-center gap-1">
-                    {providers.length === 0 ? (
-                      <Plug className="size-4 text-muted-foreground" />
-                    ) : (
-                      providers.map((provider) => {
-                        const Icon = ICONS[provider];
-                        return <Icon key={provider} className="size-4 text-muted-foreground" />;
-                      })
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1 basis-[calc(100%-2.5rem)] sm:basis-auto">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-[13px] font-semibold">{workflow.name}</span>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                          workflow.enabled
-                            ? "bg-emerald-500/15 text-emerald-500"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {workflow.enabled ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-                    <p className="truncate text-[11px] text-muted-foreground">
-                      {TRIGGER_LABELS[workflow.triggerType]} ·{" "}
-                      {ACTION_LABELS[workflow.actionType]}
-                      {workflow.triggerType === "schedule"
-                        ? ` · ${REPEAT_LABELS[workflow.repeatRule]}${
-                            workflow.timeSlots.length ? ` · ${workflow.timeSlots.join(", ")}` : ""
-                          }`
-                        : ""}
-                    </p>
-                    {activityOf(workflow) ? (
-                      <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] font-medium text-foreground/80">
-                        {workflow.runState && workflow.runState !== "idle" ? (
-                          <Loader2 className="size-3 shrink-0 animate-spin" />
-                        ) : null}
-                        {activityOf(workflow)}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="ml-auto flex shrink-0 items-center gap-1">
-                    {manual ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Run now"
-                        disabled={runningId === workflow.id}
-                        onClick={async () => {
-                          setRunningId(workflow.id);
-                          try {
-                            await run({ data: { id: workflow.id } });
-                            toast.success("Run started — it will publish in the background");
-                            refresh();
-                          } catch (err) {
-                            toast.error(err instanceof Error ? err.message : "Run failed");
-                          } finally {
-                            setRunningId(null);
-                          }
-                        }}
-                        className="size-9 rounded-full"
-                      >
-                        {runningId === workflow.id ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Play className="size-4" />
-                        )}
-                      </Button>
-                    ) : null}
                     <Switch
                       checked={workflow.enabled}
                       aria-label={workflow.enabled ? "Pause workflow" : "Activate workflow"}
@@ -215,32 +193,61 @@ function WorkflowsPage() {
                         refresh();
                       }}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Edit workflow"
-                      onClick={() =>
-                        navigate({ to: "/workflows/create", search: { id: workflow.id } })
-                      }
-                      className="size-9 rounded-full"
-                    >
-                      <Settings className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Delete workflow"
-                      onClick={async () => {
-                        await remove({ data: { id: workflow.id } });
-                        toast.success("Workflow deleted");
-                        refresh();
-                      }}
-                      className="size-9 rounded-full text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Workflow options"
+                          className="size-8 rounded-full"
+                        >
+                          <MoreVertical className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        {manual ? (
+                          <DropdownMenuItem
+                            disabled={runningId === workflow.id}
+                            onClick={async () => {
+                              setRunningId(workflow.id);
+                              try {
+                                await run({ data: { id: workflow.id } });
+                                toast.success("Run started \u2014 it will publish in the background");
+                                refresh();
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : "Run failed");
+                              } finally {
+                                setRunningId(null);
+                              }
+                            }}
+                          >
+                            {runningId === workflow.id ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Play className="size-4" />
+                            )}
+                            <span>Run</span>
+                          </DropdownMenuItem>
+                        ) : null}
+                        <DropdownMenuItem
+                          onClick={() => navigate({ to: "/workflows/create", search: { id: workflow.id } })}
+                        >
+                          <Settings className="size-4" />
+                          <span>Edit</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => {
+                            setDeletingWorkflow({ id: workflow.id, name: workflow.name });
+                            setDeleteConfirm("");
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                          <span>Delete</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </li>
               );
@@ -248,6 +255,38 @@ function WorkflowsPage() {
           </ul>
         )}
       </div>
+
+      <Dialog open={!!deletingWorkflow} onOpenChange={(open) => !open && setDeletingWorkflow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete workflow?</DialogTitle>
+            <DialogDescription>
+              This cannot be undone. Type <span className="font-semibold">Delete</span> below to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder='Type "Delete"'
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingWorkflow(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirm !== "Delete"}
+              onClick={confirmDelete}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </StudioLayout>
   );
 }
