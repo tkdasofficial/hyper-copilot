@@ -280,7 +280,7 @@ function VideoAgent() {
   const start = useServerFn(startVideoRender);
   const resolvePlaybackUrl = useServerFn(getVideoPlaybackUrl);
 
-  // Follow the render row the GitHub Actions pipeline writes progress into.
+  // Follow the render row the render pipeline writes progress into.
   useEffect(() => {
     if (!videoId) return;
     const activeId = videoId;

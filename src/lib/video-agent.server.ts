@@ -8,7 +8,7 @@
  *      hands the row to the pipeline.
  *   2. `dispatchVideoRender` — runs in the pipeline (`/api/public/pipeline/render`
  *      or the per-minute tick): reserves the credit, asks the external GitHub
- *      render pipeline to build the video and records the outcome on the row.
+ *      render service to build the video and records the outcome on the row.
  *
  * Both the interactive Video Agent page and the workflow scheduler go through
  * the same two steps, so neither path can drift from the other.
