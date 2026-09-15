@@ -7,7 +7,7 @@
  *      sanity check and a pending `videos` row. A database trigger on that insert
  *      hands the row to the pipeline.
  *   2. `dispatchVideoRender` — runs in the pipeline (`/api/public/pipeline/render`
- *      or the per-minute tick): reserves the credit, asks the external GitHub
+ *      or the per-minute tick): reserves the credit, asks the external
  *      render service to build the video and records the outcome on the row.
  *
  * Both the interactive Video Agent page and the workflow scheduler go through
