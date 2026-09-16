@@ -18,6 +18,7 @@ import {
   storedAsset,
 } from "@/lib/workflows.server";
 import { isVideoAction } from "@/lib/social.shared";
+import { generatePlatformTitles } from "@/lib/title-generator.server";
 import { createVideoRequest } from "@/lib/video-agent.server";
 import { visualStylePrompt } from "@/lib/style-presets";
 
