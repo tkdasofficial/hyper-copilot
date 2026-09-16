@@ -18,6 +18,7 @@ import {
   storedAsset,
 } from "@/lib/workflows.server";
 import { isVideoAction } from "@/lib/social.shared";
+import { generatePlatformTitles } from "@/lib/title-generator.server";
 import { createVideoRequest } from "@/lib/video-agent.server";
 import { visualStylePrompt } from "@/lib/style-presets";
 
@@ -238,6 +239,14 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       .eq("user_id", raw.user_id)
       .in("id", raw.targets ?? []);
 
+    // A unique, story-driven title set for this exact video (per platform).
+    const generated = await generatePlatformTitles({
+      script: creation.instructions,
+      caption: raw.caption,
+      name: raw.name,
+      category: creation.category,
+    });
+
     // Each platform builds its own sanitized title/caption from this source.
     const contentSource = {
       hookTitle: raw.hook_title,
@@ -245,6 +254,7 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       caption: raw.caption || creation.instructions,
       name: raw.name,
       category: creation.category,
+      generated,
     };
 
     const results: { account: string; ok: boolean; detail: string }[] = [];

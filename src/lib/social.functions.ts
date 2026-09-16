@@ -90,11 +90,14 @@ function friendlyMetaError(status: number, body: string): string {
   return `Meta could not complete the request [${status}]: ${message}`;
 }
 
-type GraphResponse = Record<string, unknown> & {
+type GraphResponse = {
   data?: unknown[];
   access_token?: string;
+  expires_in?: number | string;
   id?: string;
   name?: string;
+  username?: string;
+  threads_profile_picture_url?: string;
   picture?: { data?: { url?: string } };
   paging?: { cursors?: { after?: string } };
   granular_scopes?: Array<{ scope?: string; target_ids?: unknown[] }>;

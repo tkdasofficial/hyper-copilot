@@ -177,12 +177,21 @@ function hashtagPool(source: ContentSource, want: number): string[] {
 /* Platform content                                                    */
 /* ------------------------------------------------------------------ */
 
+/** One AI-written, story-specific title variant. */
+export type GeneratedTitle = { title: string; hashtags: string[] };
+
 export type ContentSource = {
   hookTitle?: string | null;
   hashtags?: unknown;
   caption?: string | null;
   name?: string | null;
   category?: string | null;
+  /** Unique per-video titles written from the script; take priority. */
+  generated?: {
+    youtube?: GeneratedTitle;
+    meta?: GeneratedTitle;
+    threads?: GeneratedTitle;
+  } | null;
 };
 
 export type PlatformContent = {
@@ -221,13 +230,18 @@ export function buildPlatformContent(
   provider: SocialProvider,
   source: ContentSource,
 ): PlatformContent {
-  const hook = hookOf(source);
-  const pool = hashtagPool(source, 15);
+  const gen = source.generated ?? null;
+  const genFor =
+    provider === "youtube" ? gen?.youtube : provider === "threads" ? gen?.threads : gen?.meta;
+  const hook = genFor?.title ? oneLine(genFor.title, 200) : hookOf(source);
+  const genTags = normalizeHashtags(genFor?.hashtags ?? [], 5);
+  const pool = normalizeHashtags([...genTags, ...hashtagPool(source, 15)], 15);
   const tags = pool.map((t) => t.slice(1));
 
   if (provider === "youtube") {
-    const titleTags = pool.slice(0, 3);
-    let title = hook;
+    // 2-3 hashtags appended to the title; whole string capped at 100 chars.
+    const titleTags = (genTags.length ? genTags : pool).slice(0, 3);
+    let title = hook.slice(0, YOUTUBE_TITLE_MAX);
     for (const tag of titleTags) {
       if (`${title} ${tag}`.length <= YOUTUBE_TITLE_MAX) title = `${title} ${tag}`;
     }
@@ -240,19 +254,20 @@ export function buildPlatformContent(
   }
 
   if (provider === "threads") {
-    const threadTags = pool.slice(0, 3).join(" ");
-    const room = THREADS_MAX - threadTags.length - 2;
+    // Threads officially supports one active tag per post.
+    const threadTag = (genTags[0] ?? pool[0] ?? "").trim();
+    const room = THREADS_MAX - threadTag.length - 2;
     const body = oneLine(hook, Math.max(40, room));
     return {
       title: hook.slice(0, 100),
       description: body,
-      caption: `${body}\n\n${threadTags}`.slice(0, THREADS_MAX),
-      tags: pool.slice(0, 3).map((t) => t.slice(1)),
+      caption: `${body}${threadTag ? `\n\n${threadTag}` : ""}`.slice(0, THREADS_MAX),
+      tags: threadTag ? [threadTag.slice(1)] : [],
     };
   }
 
   // Instagram + Facebook: caption with 4-5 high-engagement hashtags.
-  const socialTags = pool.slice(0, 5);
+  const socialTags = pool.slice(0, Math.max(4, Math.min(5, pool.length)));
   const caption = `${hook}\n\n${socialTags.join(" ")}`.trim();
   return {
     title: hook.slice(0, 100),
