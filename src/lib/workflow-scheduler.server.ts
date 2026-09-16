@@ -238,6 +238,14 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       .eq("user_id", raw.user_id)
       .in("id", raw.targets ?? []);
 
+    // A unique, story-driven title set for this exact video (per platform).
+    const generated = await generatePlatformTitles({
+      script: creation.instructions,
+      caption: raw.caption,
+      name: raw.name,
+      category: creation.category,
+    });
+
     // Each platform builds its own sanitized title/caption from this source.
     const contentSource = {
       hookTitle: raw.hook_title,
@@ -245,6 +253,7 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       caption: raw.caption || creation.instructions,
       name: raw.name,
       category: creation.category,
+      generated,
     };
 
     const results: { account: string; ok: boolean; detail: string }[] = [];
