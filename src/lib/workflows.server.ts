@@ -72,8 +72,8 @@ async function waitForContainer(base: string, containerId: string, token: string
   throw new Error(`The platform is still processing the video (${lastStatus || "IN_PROGRESS"}).`);
 }
 
-/** YouTube category used for every upload (20 = Gaming). */
-export const YOUTUBE_CATEGORY_ID = "20";
+/** YouTube category used for every upload (24 = Entertainment). */
+export const YOUTUBE_CATEGORY_ID = "24";
 
 export type PublishOptions = {
   /** Public image URL used as the Instagram Reels cover frame. */

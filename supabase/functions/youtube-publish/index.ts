@@ -135,7 +135,7 @@ async function upload(input: UploadInput) {
       title,
       description: (input.description ?? "").slice(0, 4900),
       tags: (input.tags ?? []).slice(0, 15),
-      categoryId: input.categoryId || "20",
+      categoryId: input.categoryId || "24",
     },
     status: {
       privacyStatus: scheduled ? "private" : input.privacyStatus || "public",
@@ -204,7 +204,7 @@ async function update(input: UpdateInput) {
     title: (input.title ?? item.snippet?.title ?? "New video").slice(0, 100),
     description: (input.description ?? item.snippet?.description ?? "").slice(0, 4900),
     tags: (input.tags ?? item.snippet?.tags ?? []).slice(0, 15),
-    categoryId: input.categoryId || item.snippet?.categoryId || "20",
+    categoryId: input.categoryId || item.snippet?.categoryId || "24",
   };
   const status = {
     privacyStatus: input.privacyStatus || item.status?.privacyStatus || "public",
