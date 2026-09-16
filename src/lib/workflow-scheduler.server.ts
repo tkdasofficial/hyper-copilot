@@ -239,13 +239,14 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       .eq("user_id", raw.user_id)
       .in("id", raw.targets ?? []);
 
-    const caption = buildPublishCaption({
+    // Each platform builds its own sanitized title/caption from this source.
+    const contentSource = {
       hookTitle: raw.hook_title,
       hashtags: raw.hashtags,
       caption: raw.caption || creation.instructions,
       name: raw.name,
       category: creation.category,
-    });
+    };
 
     const results: { account: string; ok: boolean; detail: string }[] = [];
     for (const target of (targets ?? []) as unknown as Parameters<typeof publishTo>[0][]) {
@@ -255,7 +256,7 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
           (isVideo && raw.action_type === "publish_post"
             ? "publish_reel"
             : raw.action_type) as Parameters<typeof publishTo>[1],
-          caption,
+          contentSource,
           mediaUrl,
         );
         results.push({
