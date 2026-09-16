@@ -58,6 +58,8 @@ export const PROVIDERS: ProviderInfo[] = [
     scopes: [
       "https://www.googleapis.com/auth/youtube.upload",
       "https://www.googleapis.com/auth/youtube.readonly",
+      // Needed for post-upload title/description/tags/privacy edits.
+      "https://www.googleapis.com/auth/youtube.force-ssl",
     ],
     authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
   },

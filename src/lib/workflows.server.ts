@@ -4,8 +4,18 @@
  * out when a schedule is next due.
  */
 
-import { GRAPH_VERSION, type ActionType, type CreationConfig, defaultCreationConfig } from "@/lib/social.shared";
+import {
+  GRAPH_VERSION,
+  type ActionType,
+  type CreationConfig,
+  type SocialProvider,
+  defaultCreationConfig,
+} from "@/lib/social.shared";
 import { normalizeArtStyle, normalizeImageStyle } from "@/lib/style-presets";
+import { buildPlatformContent, type ContentSource } from "@/lib/publish-content";
+
+export { buildPlatformContent, buildPublishCaption, sanitizeText } from "@/lib/publish-content";
+export type { ContentSource, ContentSource as CaptionSource } from "@/lib/publish-content";
 
 const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const THREADS_GRAPH = "https://graph.threads.net/v1.0";
@@ -62,20 +72,42 @@ async function waitForContainer(base: string, containerId: string, token: string
   throw new Error(`The platform is still processing the video (${lastStatus || "IN_PROGRESS"}).`);
 }
 
+/** YouTube category used for every upload (20 = Gaming). */
+export const YOUTUBE_CATEGORY_ID = "20";
+
+export type PublishOptions = {
+  /** Public image URL used as the Instagram Reels cover frame. */
+  coverUrl?: string | null;
+  /** ISO timestamp for scheduled publishing where the platform supports it. */
+  scheduledPublishAt?: string | null;
+};
+
 /**
  * Publishes to one account and returns the platform's post id. The id is the
  * proof-of-publish the cleanup step waits for: without it we never delete the
  * generated media.
+ *
+ * The caller passes the raw content source; each platform gets its own
+ * sanitized title/description/caption + hashtag split (see publish-content).
  */
 export async function publishTo(
   target: Target,
   action: ActionType,
-  caption: string,
+  source: ContentSource | string,
   mediaUrl: string,
+  options: PublishOptions = {},
 ): Promise<string> {
   const token = target.access_token;
   if (!token) throw new Error("This account needs to be reconnected.");
   const isVideo = action === "publish_reel" || action === "crosspost";
+  const contentSource: ContentSource =
+    typeof source === "string" ? { caption: source } : source;
+  const content = buildPlatformContent(target.provider as SocialProvider, contentSource);
+
+  const scheduledAt = options.scheduledPublishAt
+    ? Math.floor(new Date(options.scheduledPublishAt).getTime() / 1000)
+    : 0;
+  const isScheduled = scheduledAt > Math.floor(Date.now() / 1000) + 600;
 
   const idOf = (res: Record<string, unknown>) => {
     const id = res["id"] ?? res["post_id"] ?? res["video_id"];
@@ -85,19 +117,18 @@ export async function publishTo(
 
   if (target.provider === "youtube") {
     if (!mediaUrl) throw new Error("YouTube needs a video file to upload.");
-    const lines = caption.split("\n").map((line) => line.trim()).filter(Boolean);
-    const title = (lines[0] ?? "New video").replace(/#\S+/g, "").trim() || "New video";
-    const tags = (caption.match(/#[\p{L}\p{N}_]+/gu) ?? []).map((tag) => tag.slice(1));
     const { callYouTube } = await import("@/lib/youtube.server");
     const out = await callYouTube<{ videoId: string }>("upload", {
       refreshToken: token,
       videoUrl: mediaUrl,
-      title,
-      description: caption,
-      tags,
-      categoryId: "22",
+      title: content.title,
+      description: content.description,
+      tags: content.tags,
+      categoryId: YOUTUBE_CATEGORY_ID,
       privacyStatus: "public",
+      madeForKids: false,
       isShort: isVideo,
+      ...(isScheduled ? { publishAt: options.scheduledPublishAt } : {}),
     });
     return out.videoId;
   }
@@ -108,8 +139,12 @@ export async function publishTo(
       return idOf(
         await postJson(`${GRAPH}/${target.external_id}/videos`, {
           file_url: mediaUrl,
-          description: caption,
+          title: content.title,
+          description: content.caption,
           access_token: token,
+          ...(isScheduled
+            ? { published: "false", scheduled_publish_time: String(scheduledAt) }
+            : {}),
         }),
       );
     }
@@ -117,15 +152,21 @@ export async function publishTo(
       return idOf(
         await postJson(`${GRAPH}/${target.external_id}/photos`, {
           url: mediaUrl,
-          caption,
+          caption: content.caption,
           access_token: token,
+          ...(isScheduled
+            ? { published: "false", scheduled_publish_time: String(scheduledAt) }
+            : {}),
         }),
       );
     }
     return idOf(
       await postJson(`${GRAPH}/${target.external_id}/feed`, {
-        message: caption,
+        message: content.caption,
         access_token: token,
+        ...(isScheduled
+          ? { published: "false", scheduled_publish_time: String(scheduledAt) }
+          : {}),
       }),
     );
   }
@@ -133,8 +174,16 @@ export async function publishTo(
   if (target.provider === "instagram") {
     if (!mediaUrl) throw new Error("Instagram needs an image or video URL.");
     const container = await postJson(`${GRAPH}/${target.external_id}/media`, {
-      ...(isVideo ? { media_type: "REELS", video_url: mediaUrl } : { image_url: mediaUrl }),
-      caption,
+      ...(isVideo
+        ? {
+            media_type: "REELS",
+            video_url: mediaUrl,
+            // Reels also land on the main grid for maximum distribution.
+            share_to_feed: "true",
+            ...(options.coverUrl ? { cover_url: options.coverUrl } : {}),
+          }
+        : { image_url: mediaUrl }),
+      caption: content.caption,
       access_token: token,
     });
     const containerId = String(container["id"]);
@@ -147,11 +196,12 @@ export async function publishTo(
     );
   }
 
-  // Threads
+  // Threads: <=500 characters, single video, replies open to everyone.
   const container = await postJson(`${THREADS_GRAPH}/${target.external_id}/threads`, {
     media_type: mediaUrl ? (isVideo ? "VIDEO" : "IMAGE") : "TEXT",
     ...(mediaUrl ? (isVideo ? { video_url: mediaUrl } : { image_url: mediaUrl }) : {}),
-    text: caption,
+    text: content.caption.slice(0, 500),
+    reply_control: "everyone",
     access_token: token,
   });
   if (mediaUrl) await waitForContainer(THREADS_GRAPH, String(container["id"]), token);
@@ -293,74 +343,3 @@ export function computeSchedulePoints(
   return { publishAt, wakeAt: new Date(wakeMs).toISOString() };
 }
 
-/* -------------------------------------------------------------------------
- * Caption builder
- *
- * Every published post carries a one-line hook plus a small set of niche
- * hashtags, separated by a blank line. Values come from the workflow record
- * (hook_title / hashtags); anything missing falls back to the workflow's own
- * caption, name and category so a publish request never goes out without text.
- * ---------------------------------------------------------------------- */
-
-const NICHE_HASHTAGS: Record<string, string[]> = {
-  "Cosmic Universe": ["#cosmos", "#universe", "#space", "#astronomy", "#nebula"],
-  "Nature Beauty": ["#nature", "#wildlife", "#naturelovers", "#earth", "#landscape"],
-  "Ocean & Sky": ["#ocean", "#sky", "#seascape", "#clouds", "#bluehour"],
-  "Micro World": ["#macro", "#microworld", "#macrophotography", "#tinyworld", "#details"],
-};
-
-const FALLBACK_HOOK = "A moment worth watching.";
-const FALLBACK_HASHTAGS = ["#cosmos", "#nature", "#universe", "#explore", "#reels"];
-
-/** Normalises loose input into `#tag` form and drops duplicates/blanks. */
-function normalizeHashtags(input: unknown): string[] {
-  const raw = Array.isArray(input)
-    ? input
-    : typeof input === "string"
-      ? input.split(/[\s,]+/)
-      : [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const item of raw) {
-    if (typeof item !== "string") continue;
-    const tag = item.trim().replace(/^#+/, "").replace(/[^\p{L}\p{N}_]/gu, "");
-    if (!tag) continue;
-    const key = `#${tag}`.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(`#${tag}`);
-    if (out.length >= 5) break;
-  }
-  return out;
-}
-
-/** Trims any text down to a single punchy line. */
-function oneLine(text: string | null | undefined): string {
-  const first = (text ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
-  return first.length > 120 ? `${first.slice(0, 117).trimEnd()}…` : first;
-}
-
-export type CaptionSource = {
-  hookTitle?: string | null;
-  hashtags?: unknown;
-  caption?: string | null;
-  name?: string | null;
-  category?: string | null;
-};
-
-/**
- * Builds the `caption` string sent to Meta's container-creation step:
- * `hook\n\n#tag #tag #tag …` — always non-empty.
- */
-export function buildPublishCaption(source: CaptionSource): string {
-  const hook =
-    oneLine(source.hookTitle) || oneLine(source.caption) || oneLine(source.name) || FALLBACK_HOOK;
-
-  let tags = normalizeHashtags(source.hashtags);
-  if (tags.length < 4) {
-    const niche = NICHE_HASHTAGS[source.category ?? ""] ?? FALLBACK_HASHTAGS;
-    tags = normalizeHashtags([...tags, ...niche, ...FALLBACK_HASHTAGS]);
-  }
-
-  return `${hook}\n\n${tags.join(" ")}`.trim();
-}
