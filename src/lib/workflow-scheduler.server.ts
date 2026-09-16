@@ -137,6 +137,7 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
 
   let mediaUrl = raw.media_url ?? "";
   let mediaPath = raw.media_path;
+  let videoPrompt: string | undefined;
 
   try {
     // 0. Nothing to build: hold a plain post until its exact publish minute.
@@ -210,6 +211,8 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
         return "rendering";
       }
 
+      videoPrompt = video.prompt;
+
       // Rendered early: keep the finished video and wait for the exact slot.
       if (!slotReached) {
         await waitForSlot("ready");
@@ -229,6 +232,13 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
         mediaPath = `videos/${path}`;
         if (!mediaUrl) throw new Error("Could not prepare the video for upload.");
       }
+    } else if (raw.pending_video_id) {
+      const { data: vid } = await admin
+        .from("videos")
+        .select("prompt")
+        .eq("id", raw.pending_video_id)
+        .maybeSingle();
+      videoPrompt = vid?.prompt;
     }
 
     // 2. Publish to every selected account and read each platform's answer.
@@ -238,6 +248,20 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       .eq("user_id", raw.user_id)
       .in("id", raw.targets ?? []);
 
+    // Try dynamic title generation if available, otherwise fall back to story-aware templates
+    let generatedTitles = null;
+    try {
+      const { generatePlatformTitles } = await import("@/lib/title-generator.server");
+      generatedTitles = await generatePlatformTitles({
+        script: videoPrompt || raw.caption || creation.instructions || raw.name,
+        caption: raw.caption,
+        name: raw.name,
+        category: creation.category,
+      });
+    } catch {
+      // Graceful fallback to deterministic builder
+    }
+
     // Each platform builds its own sanitized, context-aware title/caption from this source.
     const contentSource = {
       hookTitle: raw.hook_title,
@@ -245,10 +269,11 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       caption: raw.caption || creation.instructions,
       name: raw.name,
       category: creation.category,
-      script: video?.prompt || raw.caption || creation.instructions || raw.name,
-      story: video?.prompt || raw.caption || creation.instructions,
-      prompt: video?.prompt,
+      script: videoPrompt || raw.caption || creation.instructions || raw.name,
+      story: videoPrompt || raw.caption || creation.instructions,
+      prompt: videoPrompt,
       instructions: creation.instructions,
+      ...(generatedTitles ? { generatedTitles } : {}),
     };
 
     const results: { account: string; ok: boolean; detail: string }[] = [];

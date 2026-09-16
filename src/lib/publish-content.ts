@@ -177,6 +177,14 @@ function hashtagPool(source: ContentSource, want: number): string[] {
 /* Platform content                                                    */
 /* ------------------------------------------------------------------ */
 
+export type PlatformTitle = { title: string; hashtags: string[] };
+
+export type GeneratedTitles = {
+  youtube: PlatformTitle;
+  meta: PlatformTitle;
+  threads: PlatformTitle;
+};
+
 export type ContentSource = {
   hookTitle?: string | null;
   hashtags?: unknown;
@@ -187,6 +195,7 @@ export type ContentSource = {
   story?: string | null;
   prompt?: string | null;
   instructions?: string | null;
+  generatedTitles?: GeneratedTitles | null;
 };
 
 export type PlatformContent = {
@@ -532,24 +541,53 @@ export function buildPlatformContent(
 
   // 1. YouTube Shorts
   if (provider === "youtube") {
-    const yt = buildYouTubeShortsTitle(subject, cleanStory, source.hookTitle, tagsPool);
+    let ytTitle: string;
+    let ytTags: string[];
+
+    if (source.generatedTitles?.youtube?.title) {
+      ytTitle = source.generatedTitles.youtube.title;
+      ytTags = source.generatedTitles.youtube.hashtags.map((t) => t.replace(/^#/, ""));
+      const joinedTags = source.generatedTitles.youtube.hashtags.join(" ");
+      if (joinedTags && !ytTitle.includes("#")) {
+        ytTitle = `${ytTitle} ${joinedTags}`.slice(0, 100).trim();
+      }
+    } else {
+      const yt = buildYouTubeShortsTitle(subject, cleanStory, source.hookTitle, tagsPool);
+      ytTitle = yt.title;
+      ytTags = yt.tags;
+    }
+
     const descTags = tagsPool.slice(0, 15);
-    const description = [yt.title, cleanStory, CALL_TO_ACTION, descTags.join(" ")]
+    const description = [ytTitle, cleanStory, CALL_TO_ACTION, descTags.join(" ")]
       .filter(Boolean)
       .join("\n\n")
       .slice(0, 4900);
 
     return {
-      title: yt.title,
+      title: ytTitle,
       description,
       caption: description,
-      tags: yt.tags,
+      tags: ytTags,
       provider: "youtube",
     };
   }
 
   // 2. Threads
   if (provider === "threads") {
+    if (source.generatedTitles?.threads?.title) {
+      const thTitle = source.generatedTitles.threads.title;
+      const thTag = source.generatedTitles.threads.hashtags[0] ?? tagsPool[0] ?? "#Story";
+      const formattedTag = thTag.startsWith("#") ? thTag : `#${thTag}`;
+      const caption = `${thTitle} ${formattedTag}`.slice(0, 500).trim();
+      return {
+        title: thTitle,
+        description: cleanStory.slice(0, 500),
+        caption,
+        tags: [formattedTag.replace(/^#/, "")],
+        provider: "threads",
+      };
+    }
+
     const th = buildThreadsContent(subject, cleanStory, source.hookTitle, tagsPool);
     return {
       title: th.title,
@@ -561,6 +599,27 @@ export function buildPlatformContent(
   }
 
   // 3. Meta (Instagram Reels & Facebook Reels)
+  if (source.generatedTitles?.meta?.title) {
+    const hook = source.generatedTitles.meta.title;
+    const metaTags = (source.generatedTitles.meta.hashtags || tagsPool).slice(0, 5);
+    const firstNarrativeSentence = cleanStory.split(/[.!?\n]/)[0]?.trim();
+    const storyLead =
+      firstNarrativeSentence &&
+      firstNarrativeSentence.length > 20 &&
+      firstNarrativeSentence !== hook
+        ? firstNarrativeSentence
+        : cleanStory.slice(0, 200).trimEnd();
+
+    const caption = `${hook}\n\n${storyLead}\n\n${metaTags.join(" ")}`.trim();
+    return {
+      title: hook.slice(0, 100),
+      description: cleanStory.slice(0, 1200),
+      caption,
+      tags: metaTags.map((t) => t.replace(/^#/, "")),
+      provider: provider === "facebook_page" ? "facebook_page" : "instagram",
+    };
+  }
+
   const meta = buildMetaReelsContent(subject, cleanStory, source.hookTitle, tagsPool);
   return {
     title: meta.title,
