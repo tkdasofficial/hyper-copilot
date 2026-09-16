@@ -7,6 +7,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+/** Plain JSON the client can safely receive. */
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
 type ManageInput = {
   connectionId: string;
   postId: string;
@@ -97,5 +100,5 @@ export const manageSocialPost = createServerFn({ method: "POST" })
       }
     };
 
-    return { ok: true, result: await run() };
+    return { ok: true, result: (await run()) as unknown as Json };
   });
