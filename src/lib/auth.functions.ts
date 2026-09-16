@@ -13,7 +13,7 @@ import { z } from "zod";
 export const checkEmailExists = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ email: z.string().email() }).parse(data))
   .handler(async ({ data }) => {
-    if (!process.env["SUPABASE_SERVICE_ROLE_KEY"] || !process.env["SUPABASE_URL"]) {
+    if (!process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
       console.warn("[auth] SUPABASE_SERVICE_ROLE_KEY missing - skipping email lookup");
       return { exists: false, checked: false };
     }
