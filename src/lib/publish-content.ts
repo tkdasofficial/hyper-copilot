@@ -177,25 +177,20 @@ function hashtagPool(source: ContentSource, want: number): string[] {
 /* Platform content                                                    */
 /* ------------------------------------------------------------------ */
 
-/** One AI-written, story-specific title variant. */
-export type GeneratedTitle = { title: string; hashtags: string[] };
-
 export type ContentSource = {
   hookTitle?: string | null;
   hashtags?: unknown;
   caption?: string | null;
   name?: string | null;
   category?: string | null;
-  /** Unique per-video titles written from the script; take priority. */
-  generated?: {
-    youtube?: GeneratedTitle;
-    meta?: GeneratedTitle;
-    threads?: GeneratedTitle;
-  } | null;
+  script?: string | null;
+  story?: string | null;
+  prompt?: string | null;
+  instructions?: string | null;
 };
 
 export type PlatformContent = {
-  /** Platform title (YouTube / Facebook video title). */
+  /** Platform title (YouTube / Facebook video title / Threads statement). */
   title: string;
   /** Long-form description (YouTube / Facebook). */
   description: string;
@@ -203,77 +198,376 @@ export type PlatformContent = {
   caption: string;
   /** Plain tag words (no `#`) for APIs that take a tag list. */
   tags: string[];
+  /** Destination provider */
+  provider?: SocialProvider;
 };
 
 const YOUTUBE_TITLE_MAX = 100;
 const THREADS_MAX = 500;
 
-function hookOf(source: ContentSource): string {
-  return (
-    oneLine(source.hookTitle) || oneLine(source.caption) || oneLine(source.name) || FALLBACK_HOOK
-  );
+/* ------------------------------------------------------------------ */
+/* Story Analysis & Dynamic Narrative Title Generator                 */
+/* ------------------------------------------------------------------ */
+
+const PROMPT_NOISE_RE =
+  /\b(?:cinematic|photorealistic|hyper-realistic|unreal engine|octane render|8k|4k|high resolution|masterpiece|best quality|trending on artstation|sharp focus|depth of field|aspect ratio|shutter speed|iso \d+|negative prompt|camera|lens|vivid colors|volumetric lighting|ray tracing|award winning|ultra realistic|high definition|natural lighting|studio lighting|render)\b/gi;
+
+/** Strips AI generation prompt noise and camera settings to uncover the raw story text. */
+export function extractCleanStory(source: ContentSource): string {
+  const raw =
+    source.script ||
+    source.story ||
+    source.prompt ||
+    source.caption ||
+    source.instructions ||
+    source.name ||
+    "";
+  const sanitized = sanitizeText(raw);
+  const clean = sanitized
+    .replace(PROMPT_NOISE_RE, "")
+    .replace(/[,\s]{2,}/g, " ")
+    .trim();
+  return clean || "A cinematic journey through an extraordinary moment.";
 }
 
-/** A short paragraph summary for description fields. */
-function summaryOf(source: ContentSource, hook: string): string {
-  const body = sanitizeText(source.caption) || sanitizeText(source.name);
-  const topic = sanitizeText(source.category) || "this story";
-  const lead = body && body !== hook ? body : `A short cinematic look at ${topic.toLowerCase()}.`;
-  return lead.length > 1200 ? `${lead.slice(0, 1199).trimEnd()}…` : lead;
+/** Extracts the core narrative subject/entity from the story text. */
+function extractCoreSubject(text: string, categoryFallback?: string | null): string {
+  // Try to find the leading subject clause before commas/conjunctions
+  const firstSentence = text.split(/[.!?\n]/)[0] ?? text;
+  const cleaned = firstSentence
+    .replace(/^(?:a|an|the|this|in|at|deep inside|close up of|cinematic shot of|exploring)\s+/i, "")
+    .trim();
+
+  // If a descriptive noun phrase can be cleanly captured:
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && words.length <= 8) {
+    // Capitalize words for title casing
+    return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  }
+
+  if (words.length > 8) {
+    const chunk = words.slice(0, 6);
+    return chunk.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  }
+
+  return categoryFallback || "The Deep Unknown";
+}
+
+/** Determines dynamic context hashtags based on story keywords and theme. */
+function extractDynamicHashtags(source: ContentSource): string[] {
+  const text =
+    `${source.script || ""} ${source.story || ""} ${source.prompt || ""} ${source.caption || ""} ${source.name || ""} ${source.category || ""}`.toLowerCase();
+  const pool: string[] = [];
+
+  // 1. User-supplied hashtags first
+  if (source.hashtags) {
+    pool.push(...normalizeHashtags(source.hashtags, 10));
+  }
+
+  // 2. Thematic keyword detection
+  if (
+    text.includes("space") ||
+    text.includes("cosmos") ||
+    text.includes("galaxy") ||
+    text.includes("planet") ||
+    text.includes("star") ||
+    text.includes("astronomy") ||
+    text.includes("nebula") ||
+    text.includes("telescope")
+  ) {
+    pool.push("#Space", "#Universe", "#Cosmos", "#Astronomy", "#DeepSpace");
+  }
+  if (
+    text.includes("ocean") ||
+    text.includes("sea") ||
+    text.includes("underwater") ||
+    text.includes("marine") ||
+    text.includes("whale") ||
+    text.includes("abyss") ||
+    text.includes("shark") ||
+    text.includes("reef") ||
+    text.includes("trench")
+  ) {
+    pool.push("#Ocean", "#DeepSea", "#MarineLife", "#Underwater", "#OceanExploration");
+  }
+  if (
+    text.includes("nature") ||
+    text.includes("forest") ||
+    text.includes("wildlife") ||
+    text.includes("animal") ||
+    text.includes("earth") ||
+    text.includes("mountain") ||
+    text.includes("rainforest")
+  ) {
+    pool.push("#Nature", "#Wildlife", "#Earth", "#Wilderness", "#NatureLovers");
+  }
+  if (
+    text.includes("macro") ||
+    text.includes("micro") ||
+    text.includes("insect") ||
+    text.includes("crystal") ||
+    text.includes("tardigrade") ||
+    text.includes("tiny") ||
+    text.includes("detail")
+  ) {
+    pool.push("#MicroWorld", "#Macro", "#TinyWorld", "#NatureDetails", "#Macrophotography");
+  }
+  if (
+    text.includes("tech") ||
+    text.includes("ai") ||
+    text.includes("future") ||
+    text.includes("cyberpunk") ||
+    text.includes("quantum") ||
+    text.includes("physics") ||
+    text.includes("robot")
+  ) {
+    pool.push("#Technology", "#SciFi", "#Physics", "#Futuristic", "#Science");
+  }
+  if (
+    text.includes("ancient") ||
+    text.includes("ruin") ||
+    text.includes("temple") ||
+    text.includes("history") ||
+    text.includes("mystery") ||
+    text.includes("myth") ||
+    text.includes("lost")
+  ) {
+    pool.push("#Mystery", "#AncientHistory", "#History", "#Archaeology", "#Legends");
+  }
+
+  // Category fallback
+  const niche = NICHE_HASHTAGS[source.category ?? ""] ?? [];
+  pool.push(...niche, ...FALLBACK_HASHTAGS);
+
+  return normalizeHashtags(pool, 15);
 }
 
 /**
- * Builds the exact text each platform should receive.
- * `action` only changes tone, never the rules above.
+ * YouTube Shorts:
+ * - Curiosity-inducing, story-driven title based on the video's core theme.
+ * - Appends 2 to 3 relevant hashtags directly at the end of the title string (e.g., "The Secret of Deep Space #Space #Universe").
+ * - Strict Constraint: Entire title string MUST NOT exceed 100 characters.
+ */
+function buildYouTubeShortsTitle(
+  subject: string,
+  cleanStory: string,
+  userHook: string | null | undefined,
+  tagsPool: string[],
+): { title: string; tags: string[] } {
+  // Select top 2-3 relevant hashtags
+  const targetTags = tagsPool.slice(0, 3);
+  let tagsToAppend = targetTags;
+  let tagsStr = tagsToAppend.join(" ");
+
+  // Derive story hook
+  let baseHook = "";
+  if (userHook && userHook.trim() && userHook.length >= 10 && userHook.length <= 70) {
+    baseHook = userHook.trim().replace(/[#]/g, "");
+  } else {
+    // Dynamically generate curiosity-inducing, story-driven title
+    const lower = cleanStory.toLowerCase();
+    if (
+      lower.includes("secret") ||
+      lower.includes("hidden") ||
+      lower.includes("beneath") ||
+      lower.includes("lost")
+    ) {
+      baseHook = `The Secret of ${subject}`;
+    } else if (
+      lower.includes("mystery") ||
+      lower.includes("unexplained") ||
+      lower.includes("strange")
+    ) {
+      baseHook = `The Unsolved Mystery of ${subject}`;
+    } else if (lower.includes("how") || lower.includes("why") || lower.includes("discover")) {
+      baseHook = `What Lies Inside ${subject}`;
+    } else if (
+      lower.includes("collide") ||
+      lower.includes("explode") ||
+      lower.includes("awaken") ||
+      lower.includes("erupt")
+    ) {
+      baseHook = `The Moment ${subject} Broke Reality`;
+    } else {
+      baseHook = `The Untold Story of ${subject}`;
+    }
+  }
+
+  // Ensure entire title string MUST NOT exceed 100 characters
+  // If baseHook + " " + tagsStr > 100, try with 2 tags first
+  if (`${baseHook} ${tagsStr}`.length > YOUTUBE_TITLE_MAX && tagsToAppend.length > 2) {
+    tagsToAppend = tagsToAppend.slice(0, 2);
+    tagsStr = tagsToAppend.join(" ");
+  }
+
+  // If still > 100 chars, truncate baseHook gracefully at word boundary
+  if (`${baseHook} ${tagsStr}`.length > YOUTUBE_TITLE_MAX) {
+    const maxHookLen = YOUTUBE_TITLE_MAX - tagsStr.length - 2;
+    if (baseHook.length > maxHookLen) {
+      const words = baseHook.split(" ");
+      let trimmed = "";
+      for (const w of words) {
+        if (`${trimmed} ${w}`.trim().length <= maxHookLen - 1) {
+          trimmed = `${trimmed} ${w}`.trim();
+        } else {
+          break;
+        }
+      }
+      baseHook = trimmed ? `${trimmed}…` : baseHook.slice(0, maxHookLen);
+    }
+  }
+
+  const finalTitle = `${baseHook} ${tagsStr}`.trim().slice(0, YOUTUBE_TITLE_MAX);
+  return {
+    title: finalTitle,
+    tags: tagsToAppend.map((t) => t.slice(1)),
+  };
+}
+
+/**
+ * Meta (Instagram Reels & Facebook Reels):
+ * - Attention-grabbing title/hook reflecting the narrative.
+ * - Includes 4 to 5 highly relevant, targeted hashtags within the title/caption text for optimal reach.
+ */
+function buildMetaReelsContent(
+  subject: string,
+  cleanStory: string,
+  userHook: string | null | undefined,
+  tagsPool: string[],
+): { title: string; caption: string; tags: string[] } {
+  // Attention-grabbing title / hook
+  let hook = "";
+  if (userHook && userHook.trim()) {
+    hook = oneLine(userHook, 90);
+  } else {
+    const lower = cleanStory.toLowerCase();
+    if (lower.includes("unbelievable") || lower.includes("rare") || lower.includes("first time")) {
+      hook = `A rare, unbelievable look into ${subject}`;
+    } else if (lower.includes("deep") || lower.includes("abyss") || lower.includes("trench")) {
+      hook = `Journey deep into the heart of ${subject}`;
+    } else if (lower.includes("danger") || lower.includes("shock") || lower.includes("extreme")) {
+      hook = `The incredible power of ${subject} revealed`;
+    } else {
+      hook = `Witness the breathtaking reality of ${subject}`;
+    }
+  }
+
+  // 4 to 5 highly relevant targeted hashtags
+  const metaTags = tagsPool.slice(0, 5);
+  while (metaTags.length < 4 && tagsPool.length > metaTags.length) {
+    metaTags.push(tagsPool[metaTags.length]);
+  }
+
+  const firstNarrativeSentence = cleanStory.split(/[.!?\n]/)[0]?.trim();
+  const storyLead =
+    firstNarrativeSentence && firstNarrativeSentence.length > 20 && firstNarrativeSentence !== hook
+      ? firstNarrativeSentence
+      : cleanStory.slice(0, 200).trimEnd();
+
+  const caption = `${hook}\n\n${storyLead}\n\n${metaTags.join(" ")}`.trim();
+
+  return {
+    title: hook.slice(0, 100),
+    caption,
+    tags: metaTags.map((t) => t.slice(1)),
+  };
+}
+
+/**
+ * Threads:
+ * - Generate a short, conversational title statement based on the story.
+ * - Append strictly 1 main Topic Tag (e.g., #Space or #Storytelling) as Threads officially supports only 1 active tag per post.
+ */
+function buildThreadsContent(
+  subject: string,
+  cleanStory: string,
+  userHook: string | null | undefined,
+  tagsPool: string[],
+): { title: string; caption: string; tags: string[] } {
+  // Generate a short, conversational title statement
+  let conversationalTitle = "";
+  if (userHook && userHook.trim()) {
+    conversationalTitle = userHook.trim().replace(/[#]/g, "");
+  } else {
+    const lower = cleanStory.toLowerCase();
+    if (lower.includes("space") || lower.includes("star") || lower.includes("planet")) {
+      conversationalTitle = `Still can't wrap my head around how massive ${subject} actually is.`;
+    } else if (lower.includes("ocean") || lower.includes("deep") || lower.includes("water")) {
+      conversationalTitle = `Exploring ${subject} honestly feels like visiting an alien planet.`;
+    } else if (lower.includes("micro") || lower.includes("tardigrade") || lower.includes("tiny")) {
+      conversationalTitle = `The details inside ${subject} are genuinely mind-bending.`;
+    } else {
+      conversationalTitle = `Taking a moment to appreciate the surreal beauty of ${subject}.`;
+    }
+  }
+
+  // Strictly 1 main Topic Tag
+  const singleTopicTag = tagsPool[0] || "#Storytelling";
+
+  const room = THREADS_MAX - singleTopicTag.length - 2;
+  const safeTitle =
+    conversationalTitle.length > room
+      ? `${conversationalTitle.slice(0, room - 1).trimEnd()}…`
+      : conversationalTitle;
+  const caption = `${safeTitle}\n\n${singleTopicTag}`.trim().slice(0, THREADS_MAX);
+
+  return {
+    title: safeTitle.slice(0, 100),
+    caption,
+    tags: [singleTopicTag.slice(1)],
+  };
+}
+
+/**
+ * Builds the exact text and metadata each destination platform should receive.
+ * Dynamically analyzes the underlying script/story to generate unique, context-aware titles.
  */
 export function buildPlatformContent(
   provider: SocialProvider,
   source: ContentSource,
 ): PlatformContent {
-  const gen = source.generated ?? null;
-  const genFor =
-    provider === "youtube" ? gen?.youtube : provider === "threads" ? gen?.threads : gen?.meta;
-  const hook = genFor?.title ? oneLine(genFor.title, 200) : hookOf(source);
-  const genTags = normalizeHashtags(genFor?.hashtags ?? [], 5);
-  const pool = normalizeHashtags([...genTags, ...hashtagPool(source, 15)], 15);
-  const tags = pool.map((t) => t.slice(1));
+  const cleanStory = extractCleanStory(source);
+  const subject = extractCoreSubject(cleanStory, source.category);
+  const tagsPool = extractDynamicHashtags(source);
 
+  // 1. YouTube Shorts
   if (provider === "youtube") {
-    // 2-3 hashtags appended to the title; whole string capped at 100 chars.
-    const titleTags = (genTags.length ? genTags : pool).slice(0, 3);
-    let title = hook.slice(0, YOUTUBE_TITLE_MAX);
-    for (const tag of titleTags) {
-      if (`${title} ${tag}`.length <= YOUTUBE_TITLE_MAX) title = `${title} ${tag}`;
-    }
-    const descTags = pool.slice(0, Math.max(10, Math.min(15, pool.length)));
-    const description = [summaryOf(source, hook), CALL_TO_ACTION, descTags.join(" ")]
+    const yt = buildYouTubeShortsTitle(subject, cleanStory, source.hookTitle, tagsPool);
+    const descTags = tagsPool.slice(0, 15);
+    const description = [yt.title, cleanStory, CALL_TO_ACTION, descTags.join(" ")]
       .filter(Boolean)
       .join("\n\n")
       .slice(0, 4900);
-    return { title: title.slice(0, YOUTUBE_TITLE_MAX), description, caption: description, tags };
-  }
 
-  if (provider === "threads") {
-    // Threads officially supports one active tag per post.
-    const threadTag = (genTags[0] ?? pool[0] ?? "").trim();
-    const room = THREADS_MAX - threadTag.length - 2;
-    const body = oneLine(hook, Math.max(40, room));
     return {
-      title: hook.slice(0, 100),
-      description: body,
-      caption: `${body}${threadTag ? `\n\n${threadTag}` : ""}`.slice(0, THREADS_MAX),
-      tags: threadTag ? [threadTag.slice(1)] : [],
+      title: yt.title,
+      description,
+      caption: description,
+      tags: yt.tags,
+      provider: "youtube",
     };
   }
 
-  // Instagram + Facebook: caption with 4-5 high-engagement hashtags.
-  const socialTags = pool.slice(0, Math.max(4, Math.min(5, pool.length)));
-  const caption = `${hook}\n\n${socialTags.join(" ")}`.trim();
+  // 2. Threads
+  if (provider === "threads") {
+    const th = buildThreadsContent(subject, cleanStory, source.hookTitle, tagsPool);
+    return {
+      title: th.title,
+      description: cleanStory.slice(0, 500),
+      caption: th.caption,
+      tags: th.tags,
+      provider: "threads",
+    };
+  }
+
+  // 3. Meta (Instagram Reels & Facebook Reels)
+  const meta = buildMetaReelsContent(subject, cleanStory, source.hookTitle, tagsPool);
   return {
-    title: hook.slice(0, 100),
-    description: summaryOf(source, hook),
-    caption,
-    tags: socialTags.map((t) => t.slice(1)),
+    title: meta.title,
+    description: cleanStory.slice(0, 1200),
+    caption: meta.caption,
+    tags: meta.tags,
+    provider: provider === "facebook_page" ? "facebook_page" : "instagram",
   };
 }
 

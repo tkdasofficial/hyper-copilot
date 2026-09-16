@@ -83,9 +83,133 @@ const NICHE_HASHTAGS: Record<string, string[]> = {
 };
 
 const FALLBACK_HOOK = "A moment worth watching.";
-const FALLBACK_HASHTAGS = ["#cosmos", "#nature", "#universe", "#explore", "#reels"];
+const FALLBACK_HASHTAGS = ["#Cosmos", "#Nature", "#Universe", "#Explore", "#Reels"];
 
-function normalizeHashtags(input: unknown): string[] {
+const PROMPT_NOISE_RE =
+  /\b(?:cinematic|photorealistic|hyper-realistic|unreal engine|octane render|8k|4k|high resolution|masterpiece|best quality|trending on artstation|sharp focus|depth of field|aspect ratio|shutter speed|iso \d+|negative prompt|camera|lens|vivid colors|volumetric lighting|ray tracing|award winning|ultra realistic|high definition|natural lighting|studio lighting|render)\b/gi;
+
+function sanitizeText(raw: string | null | undefined): string {
+  if (!raw) return "";
+  return String(raw)
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/\{[^}]*\}/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/["“”'‘’`]/g, "")
+    .replace(/[|*_#]+/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function extractCleanStory(rawText: string | null | undefined): string {
+  const sanitized = sanitizeText(rawText);
+  const clean = sanitized
+    .replace(PROMPT_NOISE_RE, "")
+    .replace(/[,\s]{2,}/g, " ")
+    .trim();
+  return clean || "An extraordinary cinematic journey.";
+}
+
+function extractCoreSubject(text: string, categoryFallback?: string | null): string {
+  const firstSentence = text.split(/[.!?\n]/)[0] ?? text;
+  const cleaned = firstSentence
+    .replace(/^(?:a|an|the|this|in|at|deep inside|close up of|cinematic shot of|exploring)\s+/i, "")
+    .trim();
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && words.length <= 8) {
+    return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  }
+  if (words.length > 8) {
+    return words
+      .slice(0, 6)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  }
+  return categoryFallback || "The Deep Unknown";
+}
+
+function extractDynamicHashtags(
+  text: string,
+  userTags: unknown,
+  category?: string | null,
+): string[] {
+  const pool: string[] = [];
+  const lower = `${text} ${category || ""}`.toLowerCase();
+
+  if (userTags) {
+    pool.push(...normalizeHashtags(userTags, 10));
+  }
+
+  if (
+    lower.includes("space") ||
+    lower.includes("cosmos") ||
+    lower.includes("galaxy") ||
+    lower.includes("planet") ||
+    lower.includes("star") ||
+    lower.includes("astronomy") ||
+    lower.includes("nebula")
+  ) {
+    pool.push("#Space", "#Universe", "#Cosmos", "#Astronomy", "#DeepSpace");
+  }
+  if (
+    lower.includes("ocean") ||
+    lower.includes("sea") ||
+    lower.includes("underwater") ||
+    lower.includes("marine") ||
+    lower.includes("whale") ||
+    lower.includes("abyss") ||
+    lower.includes("shark") ||
+    lower.includes("reef")
+  ) {
+    pool.push("#Ocean", "#DeepSea", "#MarineLife", "#Underwater", "#OceanExploration");
+  }
+  if (
+    lower.includes("nature") ||
+    lower.includes("forest") ||
+    lower.includes("wildlife") ||
+    lower.includes("animal") ||
+    lower.includes("earth") ||
+    lower.includes("mountain")
+  ) {
+    pool.push("#Nature", "#Wildlife", "#Earth", "#Wilderness", "#NatureLovers");
+  }
+  if (
+    lower.includes("macro") ||
+    lower.includes("micro") ||
+    lower.includes("insect") ||
+    lower.includes("crystal") ||
+    lower.includes("tardigrade") ||
+    lower.includes("tiny")
+  ) {
+    pool.push("#MicroWorld", "#Macro", "#TinyWorld", "#NatureDetails", "#Macrophotography");
+  }
+  if (
+    lower.includes("tech") ||
+    lower.includes("ai") ||
+    lower.includes("future") ||
+    lower.includes("cyberpunk") ||
+    lower.includes("quantum") ||
+    lower.includes("physics")
+  ) {
+    pool.push("#Technology", "#SciFi", "#Physics", "#Futuristic", "#Science");
+  }
+  if (
+    lower.includes("ancient") ||
+    lower.includes("ruin") ||
+    lower.includes("temple") ||
+    lower.includes("history") ||
+    lower.includes("mystery")
+  ) {
+    pool.push("#Mystery", "#AncientHistory", "#History", "#Archaeology", "#Legends");
+  }
+
+  const niche = NICHE_HASHTAGS[category ?? ""] ?? [];
+  pool.push(...niche, ...FALLBACK_HASHTAGS);
+
+  return normalizeHashtags(pool, 15);
+}
+
+function normalizeHashtags(input: unknown, limit = 15): string[] {
   const raw = Array.isArray(input) ? input : typeof input === "string" ? input.split(/[\s,]+/) : [];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -100,31 +224,109 @@ function normalizeHashtags(input: unknown): string[] {
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(`#${tag}`);
-    if (out.length >= 5) break;
+    if (out.length >= limit) break;
   }
   return out;
 }
 
-function oneLine(text: string | null | undefined): string {
+function oneLine(text: string | null | undefined, max = 120): string {
   const first =
     (text ?? "")
       .split(/\r?\n/)
       .map((l) => l.trim())
       .find(Boolean) ?? "";
-  return first.length > 120 ? `${first.slice(0, 117).trimEnd()}…` : first;
+  return first.length > max ? `${first.slice(0, max - 3).trimEnd()}…` : first;
 }
 
-function buildCaption(req: PublishRequest): string {
-  if (req.caption && !req.hookTitle && !req.hashtags) {
-    return req.caption.trim();
+/**
+ * Builds destination-specific metadata:
+ * - Meta (Instagram & Facebook): Attention-grabbing hook + story + 4 to 5 targeted hashtags.
+ * - Threads: Short conversational statement + strictly 1 main Topic Tag.
+ */
+function buildPlatformPayload(
+  provider: string,
+  req: {
+    hookTitle?: string;
+    caption?: string;
+    hashtags?: unknown;
+    category?: string;
+    script?: string;
+    story?: string;
+    title?: string;
+  },
+): { title: string; caption: string } {
+  const rawStory = req.script || req.story || req.caption || req.hookTitle || "";
+  const cleanStory = extractCleanStory(rawStory);
+  const subject = extractCoreSubject(cleanStory, req.category);
+  const tagPool = extractDynamicHashtags(cleanStory, req.hashtags, req.category);
+
+  if (provider === "threads") {
+    let conversationalTitle = "";
+    if (req.hookTitle && req.hookTitle.trim()) {
+      conversationalTitle = req.hookTitle.trim().replace(/[#]/g, "");
+    } else {
+      const lower = cleanStory.toLowerCase();
+      if (lower.includes("space") || lower.includes("star") || lower.includes("planet")) {
+        conversationalTitle = `Still can't wrap my head around how massive ${subject} actually is.`;
+      } else if (lower.includes("ocean") || lower.includes("deep") || lower.includes("water")) {
+        conversationalTitle = `Exploring ${subject} honestly feels like visiting an alien planet.`;
+      } else if (
+        lower.includes("micro") ||
+        lower.includes("tardigrade") ||
+        lower.includes("tiny")
+      ) {
+        conversationalTitle = `The details inside ${subject} are genuinely mind-bending.`;
+      } else {
+        conversationalTitle = `Taking a moment to appreciate the surreal beauty of ${subject}.`;
+      }
+    }
+
+    // Threads officially supports only 1 active tag per post
+    const singleTopicTag = tagPool[0] || "#Storytelling";
+    const room = 500 - singleTopicTag.length - 2;
+    const safeTitle =
+      conversationalTitle.length > room
+        ? `${conversationalTitle.slice(0, room - 1).trimEnd()}…`
+        : conversationalTitle;
+
+    return {
+      title: safeTitle.slice(0, 100),
+      caption: `${safeTitle}\n\n${singleTopicTag}`.trim().slice(0, 500),
+    };
   }
-  const hook = oneLine(req.hookTitle) || oneLine(req.caption) || FALLBACK_HOOK;
-  let tags = normalizeHashtags(req.hashtags);
-  if (tags.length < 4) {
-    const niche = NICHE_HASHTAGS[req.category ?? ""] ?? FALLBACK_HASHTAGS;
-    tags = normalizeHashtags([...tags, ...niche, ...FALLBACK_HASHTAGS]);
+
+  // Instagram & Facebook: Attention-grabbing hook reflecting narrative + 4 to 5 targeted hashtags
+  let hook = req.title || req.hookTitle;
+  if (!hook || !hook.trim()) {
+    const lower = cleanStory.toLowerCase();
+    if (lower.includes("unbelievable") || lower.includes("rare") || lower.includes("first time")) {
+      hook = `A rare, unbelievable look into ${subject}`;
+    } else if (lower.includes("deep") || lower.includes("abyss") || lower.includes("trench")) {
+      hook = `Journey deep into the heart of ${subject}`;
+    } else if (lower.includes("danger") || lower.includes("shock") || lower.includes("extreme")) {
+      hook = `The incredible power of ${subject} revealed`;
+    } else {
+      hook = `Witness the breathtaking reality of ${subject}`;
+    }
   }
-  return `${hook}\n\n${tags.join(" ")}`.trim();
+
+  const metaTags = tagPool.slice(0, 5);
+  while (metaTags.length < 4 && tagPool.length > metaTags.length) {
+    metaTags.push(tagPool[metaTags.length]);
+  }
+
+  const firstSentence = cleanStory.split(/[.!?\n]/)[0]?.trim();
+  const storyLead =
+    firstSentence && firstSentence.length > 20 && firstSentence !== hook
+      ? firstSentence
+      : cleanStory.slice(0, 200).trimEnd();
+
+  const caption = `${hook}\n\n${storyLead}\n\n${metaTags.join(" ")}`.trim();
+
+  return {
+    title: hook.slice(0, 100),
+    caption,
+  };
 }
 
 export async function publishToMeta(
@@ -132,6 +334,7 @@ export async function publishToMeta(
   action: ActionType,
   caption: string,
   mediaUrl: string,
+  title?: string,
 ): Promise<string> {
   const token = target.access_token;
   if (!token) throw new Error("This account needs to be reconnected (missing access token).");
@@ -149,6 +352,7 @@ export async function publishToMeta(
       if (!mediaUrl) throw new Error("A video URL is required for a reel.");
       const res = await postJson(`${GRAPH}/${target.external_id}/videos`, {
         file_url: mediaUrl,
+        ...(title ? { title } : {}),
         description: caption,
         access_token: token,
       });
@@ -188,10 +392,11 @@ export async function publishToMeta(
 
   // 3. Threads
   if (target.provider === "threads") {
+    const textBody = caption.slice(0, 500);
     const container = await postJson(`${THREADS_GRAPH}/${target.external_id}/threads`, {
       media_type: mediaUrl ? (isVideo ? "VIDEO" : "IMAGE") : "TEXT",
       ...(mediaUrl ? (isVideo ? { video_url: mediaUrl } : { image_url: mediaUrl }) : {}),
-      text: caption,
+      text: textBody,
       access_token: token,
     });
     if (mediaUrl) await waitForContainer(THREADS_GRAPH, String(container["id"]), token);
@@ -265,6 +470,7 @@ Deno.serve(async (req: Request) => {
       target: Target;
       action: ActionType;
       caption: string;
+      title?: string;
       mediaUrl: string;
     }[] = [];
 
@@ -297,15 +503,15 @@ Deno.serve(async (req: Request) => {
         mediaUrl = signed?.signedUrl ?? "";
       }
 
-      const caption = buildCaption({
-        target: { id: "", provider: "", external_id: "", display_name: null, access_token: null },
-        action: workflow.action_type,
-        caption: workflow.caption,
-        hookTitle: workflow.hook_title,
-        hashtags: workflow.hashtags,
-        category: (workflow.creation_config as Record<string, unknown>)?.category as string,
-        mediaUrl,
-      });
+      let videoScript = "";
+      if (workflow.pending_video_id) {
+        const { data: vid } = await supabase
+          .from("videos")
+          .select("prompt")
+          .eq("id", workflow.pending_video_id)
+          .maybeSingle();
+        videoScript = vid?.prompt ?? "";
+      }
 
       const isVideo =
         workflow.action_type === "publish_reel" || workflow.action_type === "crosspost";
@@ -313,21 +519,45 @@ Deno.serve(async (req: Request) => {
         isVideo && workflow.action_type === "publish_post" ? "publish_reel" : workflow.action_type
       ) as ActionType;
 
-      targetsToPublish = (connections ?? []).map((c) => ({
-        target: c as Target,
-        action,
-        caption,
-        mediaUrl,
-      }));
+      targetsToPublish = (connections ?? []).map((c) => {
+        const payload = buildPlatformPayload(c.provider, {
+          hookTitle: workflow.hook_title,
+          caption: workflow.caption,
+          hashtags: workflow.hashtags,
+          category: (workflow.creation_config as Record<string, unknown>)?.category as string,
+          script:
+            videoScript ||
+            ((workflow.creation_config as Record<string, unknown>)?.instructions as string) ||
+            workflow.caption,
+          title: workflow.hook_title,
+        });
+
+        return {
+          target: c as Target,
+          action,
+          caption: payload.caption,
+          title: payload.title,
+          mediaUrl,
+        };
+      });
     } else if (body.target) {
-      const caption = buildCaption(body);
       const mediaUrl = body.mediaUrl || body.media_url || "";
       const action = body.action || body.action_type || "publish_post";
+      const payload = buildPlatformPayload(body.target.provider, {
+        hookTitle: body.hookTitle,
+        caption: body.caption,
+        hashtags: body.hashtags,
+        category: body.category,
+        script: body.script || body.story,
+        title: body.title,
+      });
+
       targetsToPublish = [
         {
           target: body.target,
           action,
-          caption,
+          caption: body.caption && !body.script && !body.hookTitle ? body.caption : payload.caption,
+          title: payload.title,
           mediaUrl,
         },
       ];
@@ -345,7 +575,13 @@ Deno.serve(async (req: Request) => {
 
     for (const item of targetsToPublish) {
       try {
-        const postId = await publishToMeta(item.target, item.action, item.caption, item.mediaUrl);
+        const postId = await publishToMeta(
+          item.target,
+          item.action,
+          item.caption,
+          item.mediaUrl,
+          item.title,
+        );
         results.push({
           targetId: item.target.id,
           account: item.target.display_name ?? item.target.provider,

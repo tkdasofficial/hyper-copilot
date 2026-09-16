@@ -18,7 +18,6 @@ import {
   storedAsset,
 } from "@/lib/workflows.server";
 import { isVideoAction } from "@/lib/social.shared";
-import { generatePlatformTitles } from "@/lib/title-generator.server";
 import { createVideoRequest } from "@/lib/video-agent.server";
 import { visualStylePrompt } from "@/lib/style-presets";
 
@@ -187,7 +186,7 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
 
       const { data: video } = await admin
         .from("videos")
-        .select("status, video_url, error, created_at")
+        .select("status, video_url, error, created_at, prompt")
         .eq("id", videoId)
         .maybeSingle();
 
@@ -239,22 +238,17 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       .eq("user_id", raw.user_id)
       .in("id", raw.targets ?? []);
 
-    // A unique, story-driven title set for this exact video (per platform).
-    const generated = await generatePlatformTitles({
-      script: creation.instructions,
-      caption: raw.caption,
-      name: raw.name,
-      category: creation.category,
-    });
-
-    // Each platform builds its own sanitized title/caption from this source.
+    // Each platform builds its own sanitized, context-aware title/caption from this source.
     const contentSource = {
       hookTitle: raw.hook_title,
       hashtags: raw.hashtags,
       caption: raw.caption || creation.instructions,
       name: raw.name,
       category: creation.category,
-      generated,
+      script: video?.prompt || raw.caption || creation.instructions || raw.name,
+      story: video?.prompt || raw.caption || creation.instructions,
+      prompt: video?.prompt,
+      instructions: creation.instructions,
     };
 
     const results: { account: string; ok: boolean; detail: string }[] = [];

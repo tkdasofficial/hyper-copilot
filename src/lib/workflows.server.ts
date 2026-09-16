@@ -152,11 +152,15 @@ export async function publishTo(
         error?: string;
       }>("publish-to-meta", {
         target,
-        // The caption is already fully platform-shaped (unique title + the
-        // exact hashtag count that platform allows), so send it verbatim.
         action,
         caption: content.caption,
         mediaUrl,
+        hookTitle: content.title,
+        category:
+          typeof source === "object" && source ? (source as ContentSource).category : undefined,
+        hashtags: content.tags,
+        script: typeof source === "object" && source ? (source as ContentSource).script : undefined,
+        title: content.title,
       });
 
       if (!metaErr && metaRes?.ok && metaRes.results?.[0]?.postId) {

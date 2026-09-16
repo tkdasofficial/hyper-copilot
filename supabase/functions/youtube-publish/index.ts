@@ -121,9 +121,32 @@ async function upload(input: UploadInput) {
   const bytes = new Uint8Array(await media.arrayBuffer());
 
   const rawTitle = (input.title ?? "").trim() || "New video";
-  const title = (
-    input.isShort && !/#shorts/i.test(rawTitle) ? `${rawTitle} #Shorts` : rawTitle
-  ).slice(0, 100);
+  let title = rawTitle;
+
+  if (input.isShort) {
+    const existingTags = (title.match(/#[\p{L}\p{N}_]+/gu) ?? []).map((t) => t.trim());
+    if (existingTags.length === 0) {
+      // Append 2 to 3 relevant hashtags directly at the end of the title string
+      const suggestedTags: string[] = [];
+      const lower = `${title} ${(input.tags ?? []).join(" ")}`.toLowerCase();
+      if (lower.includes("space") || lower.includes("cosmos") || lower.includes("star")) {
+        suggestedTags.push("#Space", "#Universe", "#Shorts");
+      } else if (lower.includes("ocean") || lower.includes("sea") || lower.includes("deep")) {
+        suggestedTags.push("#Ocean", "#DeepSea", "#Shorts");
+      } else if (lower.includes("nature") || lower.includes("wildlife")) {
+        suggestedTags.push("#Nature", "#Wildlife", "#Shorts");
+      } else {
+        suggestedTags.push("#Entertainment", "#Viral", "#Shorts");
+      }
+
+      const tagsToAdd = suggestedTags.slice(0, 3);
+      const combined = `${title} ${tagsToAdd.join(" ")}`.trim();
+      title = combined.length <= 100 ? combined : `${title} #Shorts`.slice(0, 100);
+    }
+  }
+
+  // Strict Constraint: Entire title string MUST NOT exceed 100 characters
+  title = title.slice(0, 100).trim();
 
   const scheduled =
     input.publishAt && new Date(input.publishAt).getTime() > Date.now()
@@ -135,7 +158,7 @@ async function upload(input: UploadInput) {
       title,
       description: (input.description ?? "").slice(0, 4900),
       tags: (input.tags ?? []).slice(0, 15),
-      categoryId: input.categoryId || "24",
+      categoryId: input.categoryId || "24", // Entertainment
     },
     status: {
       privacyStatus: scheduled ? "private" : input.privacyStatus || "public",
