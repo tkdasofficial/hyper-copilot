@@ -177,12 +177,21 @@ function hashtagPool(source: ContentSource, want: number): string[] {
 /* Platform content                                                    */
 /* ------------------------------------------------------------------ */
 
+/** One AI-written, story-specific title variant. */
+export type GeneratedTitle = { title: string; hashtags: string[] };
+
 export type ContentSource = {
   hookTitle?: string | null;
   hashtags?: unknown;
   caption?: string | null;
   name?: string | null;
   category?: string | null;
+  /** Unique per-video titles written from the script; take priority. */
+  generated?: {
+    youtube?: GeneratedTitle;
+    meta?: GeneratedTitle;
+    threads?: GeneratedTitle;
+  } | null;
 };
 
 export type PlatformContent = {
