@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/config";
 
 const KEY = "hyper:guest";
 

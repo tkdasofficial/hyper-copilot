@@ -5,7 +5,8 @@ const PIXAZO_BASE = "https://gateway.pixazo.ai";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-worker-secret",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-worker-secret",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
@@ -20,11 +21,14 @@ function videoSize(aspect = "16:9", resolution = "720p"): { width: number; heigh
   return resolution === "1080p" ? { width: 1920, height: 1080 } : { width: 1280, height: 720 };
 }
 
-
 // --- Backend-only access guard (added by Lovable) ---
 async function assertBackendCaller(req: Request): Promise<Response | null> {
   const url = new URL(req.url);
-  const token = (req.headers.get("x-worker-secret") ?? url.searchParams.get("worker_secret") ?? "").trim();
+  const token = (
+    req.headers.get("x-worker-secret") ??
+    url.searchParams.get("worker_secret") ??
+    ""
+  ).trim();
   const serviceKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
   const auth = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
 
@@ -82,7 +86,8 @@ Deno.serve(async (req: Request) => {
         headers: { "Ocp-Apim-Subscription-Key": pixazoKey },
       });
       const text = await statusRes.text();
-      if (!statusRes.ok) throw new Error(`Video status check failed (${statusRes.status}): ${text}`);
+      if (!statusRes.ok)
+        throw new Error(`Video status check failed (${statusRes.status}): ${text}`);
       const data = JSON.parse(text) as {
         status?: string;
         error?: string;
@@ -124,7 +129,8 @@ Deno.serve(async (req: Request) => {
         headers: { "Ocp-Apim-Subscription-Key": pixazoKey },
       });
       const text = await statusRes.text();
-      if (!statusRes.ok) throw new Error(`Video status check failed (${statusRes.status}): ${text}`);
+      if (!statusRes.ok)
+        throw new Error(`Video status check failed (${statusRes.status}): ${text}`);
       const data = JSON.parse(text) as {
         status?: string;
         error?: string;
@@ -183,7 +189,9 @@ Deno.serve(async (req: Request) => {
 
     const resText = await pixazoRes.text();
     if (!pixazoRes.ok) {
-      throw new Error(`Video generation request failed [${pixazoRes.status}]: ${resText.slice(0, 300)}`);
+      throw new Error(
+        `Video generation request failed [${pixazoRes.status}]: ${resText.slice(0, 300)}`,
+      );
     }
 
     const resData = JSON.parse(resText) as { request_id?: string };

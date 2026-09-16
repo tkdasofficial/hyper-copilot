@@ -3,9 +3,9 @@ import { pageHead } from "@/lib/seo";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Loader2, Lock, Mail, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/config";
 import { startGuest } from "@/lib/guest";
-import { checkEmailExists } from "@/lib/auth.functions";
+import { checkEmailExists, recordEmailRegistered } from "@/lib/auth.functions";
 import { Logo } from "@/components/hyper/Logo";
 
 export const Route = createFileRoute("/auth")({
@@ -26,9 +26,7 @@ export const Route = createFileRoute("/auth")({
         "free AI account signup",
         "google sign in AI studio",
       ],
-      breadcrumbs: [
-        { name: "Sign in", path: "/auth" },
-      ],
+      breadcrumbs: [{ name: "Sign in", path: "/auth" }],
     }),
   component: AuthPage,
 });
@@ -101,6 +99,7 @@ function AuthPage() {
         toast.error(error.message);
         return;
       }
+      recordEmailRegistered({ data: { email: email.trim() } }).catch(() => {});
       await routeAfterLogin();
       return;
     }
@@ -113,28 +112,45 @@ function AuthPage() {
     setBusy(false);
 
     if (error) {
-      // The email lookup may be unavailable; recover by switching to sign in.
       if (/already\s*registered|already\s*exists|User already/i.test(error.message)) {
+        recordEmailRegistered({ data: { email: email.trim() } }).catch(() => {});
+        setBusy(true);
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        setBusy(false);
+        if (!signInError) {
+          await routeAfterLogin();
+          return;
+        }
         setStep("login");
-        setPassword("");
-        toast.info("You already have an account. Enter your password to sign in.");
+        toast.error(signInError.message);
         return;
       }
       toast.error(error.message);
       return;
     }
 
-    // Supabase hides account existence by returning a user with no identities
-    // instead of an error. Treat that as "this email already has an account".
     if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      recordEmailRegistered({ data: { email: email.trim() } }).catch(() => {});
+      setBusy(true);
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      setBusy(false);
+      if (!signInError) {
+        await routeAfterLogin();
+        return;
+      }
       setStep("login");
-      setPassword("");
-      toast.info("You already have an account. Enter your password to sign in.");
+      toast.error(signInError.message);
       return;
     }
 
+    recordEmailRegistered({ data: { email: email.trim() } }).catch(() => {});
     window.sessionStorage.setItem("hyper:pending-email", email.trim());
-
 
     if (data.session?.user.email_confirmed_at) {
       navigate({ to: "/getting-ready", replace: true });
@@ -148,7 +164,9 @@ function AuthPage() {
     try {
       const { session } = await startGuest();
       toast.success(
-        session ? "You're in as a guest." : "Guest preview — sign up when you're ready to generate.",
+        session
+          ? "You're in as a guest."
+          : "Guest preview — sign up when you're ready to generate.",
       );
       navigate({ to: "/dashboard", replace: true });
     } finally {

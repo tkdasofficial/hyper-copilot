@@ -35,7 +35,6 @@ import {
 } from "@/lib/media.shared";
 import { ResultsGrid, type GenResult } from "./ResultsGrid";
 
-
 const modalities = [
   { label: "Image", icon: ImageIcon },
   { label: "Video", icon: Video },
@@ -63,14 +62,11 @@ const imageModels = [
 
 const modelsByModality: Record<string, { id: string; name: string; note: string }[]> = {
   Image: imageModels,
-  Video: [
-    { id: "hyper-video-omni", name: "Hyper Video Omni", note: "Text & image to video" },
-  ],
+  Video: [{ id: "hyper-video-omni", name: "Hyper Video Omni", note: "Text & image to video" }],
   Audio: TTS_MODELS.map((m) => ({ id: m.id, name: m.name, note: m.note })),
 
   Vector: imageModels,
 };
-
 
 const ratios = [
   { label: "1:1", note: "Square", w: 1, h: 1 },
@@ -125,7 +121,6 @@ const suggestionsByModality: Record<string, string[]> = {
     "minimal geometric logo mark, two colors",
   ],
 };
-
 
 function Chip({
   icon: Icon,
@@ -226,9 +221,9 @@ export function PromptComposer() {
   const [styleStrength, setStyleStrength] = useState([65]);
   const [modes, setModes] = useState<string[]>([]);
   const [referenceWeight, setReferenceWeight] = useState([50]);
-  const [refs, setRefs] = useState<
-    { id: string; name: string; url: string; dataUrl?: string }[]
-  >([]);
+  const [refs, setRefs] = useState<{ id: string; name: string; url: string; dataUrl?: string }[]>(
+    [],
+  );
   const [count, setCount] = useState([4]);
   const [seedLocked, setSeedLocked] = useState(false);
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 999999));
@@ -268,8 +263,6 @@ export function PromptComposer() {
     reader.readAsDataURL(f);
   };
 
-
-
   const toggleMode = (id: string) =>
     setModes((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]));
 
@@ -308,7 +301,6 @@ export function PromptComposer() {
     if (!activeRatios.some((r) => r.label === ratio.label)) setRatio(activeRatios[0]!);
     if (!supportsReferences && active !== "Audio" && modes.length) setModes([]);
   }, [activeRatios, ratio.label, supportsReferences, active, modes.length]);
-
 
   const onFiles = (files: FileList | null) => {
     if (!files) return;
@@ -438,7 +430,8 @@ export function PromptComposer() {
         placeholders.map(async (ph, i) => {
           try {
             const res = await runJob("image", prompt, {
-              prompt: active === "Vector" ? `${prompt}. flat vector illustration, clean shapes` : prompt,
+              prompt:
+                active === "Vector" ? `${prompt}. flat vector illustration, clean shapes` : prompt,
               model: model.id,
               aspect: ratio.label,
               seed: nextSeed + i,
@@ -449,7 +442,9 @@ export function PromptComposer() {
               referenceWeight: referenceWeight[0] ?? 50,
             });
             setResults((list) =>
-              list.map((r) => (r.id === ph.id ? { ...r, dataUrl: res.url ?? "", isFinal: true } : r)),
+              list.map((r) =>
+                r.id === ph.id ? { ...r, dataUrl: res.url ?? "", isFinal: true } : r,
+              ),
             );
           } catch (err) {
             setResults((list) =>
@@ -471,7 +466,6 @@ export function PromptComposer() {
       setGenerating(false);
     }
   };
-
 
   return (
     <div className="w-full">
@@ -527,7 +521,10 @@ export function PromptComposer() {
           ) : null}
 
           <div className="flex items-start gap-2.5 px-1.5 pt-1.5">
-            <Sparkles className="mt-0.5 h-[18px] w-[18px] shrink-0 text-spectral-2" strokeWidth={2} />
+            <Sparkles
+              className="mt-0.5 h-[18px] w-[18px] shrink-0 text-spectral-2"
+              strokeWidth={2}
+            />
             <textarea
               value={value}
               onChange={(e) => setValue(e.target.value)}
@@ -581,9 +578,7 @@ export function PromptComposer() {
                       type="button"
                       aria-label={slot === 0 ? "Upload start frame" : "Upload end frame"}
                       title={slot === 0 ? "Start frame" : "End frame"}
-                      onClick={() =>
-                        (slot === 0 ? startFrameRef : endFrameRef).current?.click()
-                      }
+                      onClick={() => (slot === 0 ? startFrameRef : endFrameRef).current?.click()}
                       className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-surface-2/70 text-muted-foreground transition-colors hover:border-border-strong hover:text-foreground"
                     >
                       {refs[slot] ? (
@@ -643,10 +638,7 @@ export function PromptComposer() {
                       <Chip glyph={<RatioGlyph w={ratio.w} h={ratio.h} />}>{ratio.label}</Chip>
                     </span>
                   </PopoverTrigger>
-                  <PopoverContent
-                    align="start"
-                    className="w-[min(20rem,calc(100vw-2rem))] p-2.5"
-                  >
+                  <PopoverContent align="start" className="w-[min(20rem,calc(100vw-2rem))] p-2.5">
                     <p className="pb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                       Aspect ratio
                     </p>
@@ -936,7 +928,9 @@ export function PromptComposer() {
                         <div className="flex items-center justify-between">
                           <span className="text-[12px] font-semibold text-foreground">
                             Lock seed
-                            <span className="ml-1.5 font-normal text-muted-foreground">#{seed}</span>
+                            <span className="ml-1.5 font-normal text-muted-foreground">
+                              #{seed}
+                            </span>
                           </span>
                           <Switch checked={seedLocked} onCheckedChange={setSeedLocked} />
                         </div>
@@ -947,7 +941,13 @@ export function PromptComposer() {
                                 <span>Reference influence</span>
                                 <span className="text-muted-foreground">{referenceWeight[0]}%</span>
                               </div>
-                              <Slider value={referenceWeight} onValueChange={setReferenceWeight} min={0} max={100} step={1} />
+                              <Slider
+                                value={referenceWeight}
+                                onValueChange={setReferenceWeight}
+                                min={0}
+                                max={100}
+                                step={1}
+                              />
                             </div>
                             <button
                               type="button"
@@ -975,7 +975,6 @@ export function PromptComposer() {
               </Chip>
             </div>
 
-
             <button
               type="button"
               aria-label="Generate"
@@ -1000,7 +999,6 @@ export function PromptComposer() {
           </button>
         ))}
       </div>
-
 
       <ResultsGrid results={results} generating={generating} />
     </div>

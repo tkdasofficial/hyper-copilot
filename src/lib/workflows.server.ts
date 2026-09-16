@@ -100,8 +100,7 @@ export async function publishTo(
   const token = target.access_token;
   if (!token) throw new Error("This account needs to be reconnected.");
   const isVideo = action === "publish_reel" || action === "crosspost";
-  const contentSource: ContentSource =
-    typeof source === "string" ? { caption: source } : source;
+  const contentSource: ContentSource = typeof source === "string" ? { caption: source } : source;
   const content = buildPlatformContent(target.provider as SocialProvider, contentSource);
 
   const scheduledAt = options.scheduledPublishAt
@@ -164,9 +163,7 @@ export async function publishTo(
       await postJson(`${GRAPH}/${target.external_id}/feed`, {
         message: content.caption,
         access_token: token,
-        ...(isScheduled
-          ? { published: "false", scheduled_publish_time: String(scheduledAt) }
-          : {}),
+        ...(isScheduled ? { published: "false", scheduled_publish_time: String(scheduledAt) } : {}),
       }),
     );
   }
@@ -342,4 +339,3 @@ export function computeSchedulePoints(
   const wakeMs = Math.max(from.getTime(), new Date(publishAt).getTime() - PRERENDER_LEAD_MS);
   return { publishAt, wakeAt: new Date(wakeMs).toISOString() };
 }
-

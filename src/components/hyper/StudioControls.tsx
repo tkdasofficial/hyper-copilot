@@ -45,7 +45,9 @@ export function Segment<T extends string>({
 }) {
   return (
     <div>
-      {label ? <p className="mb-2 text-[12px] font-semibold text-muted-foreground">{label}</p> : null}
+      {label ? (
+        <p className="mb-2 text-[12px] font-semibold text-muted-foreground">{label}</p>
+      ) : null}
       <div className="-mx-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex w-max snap-x snap-mandatory gap-1.5 rounded-2xl border border-border bg-background p-1">
           {options.map((o) => {
@@ -141,7 +143,9 @@ export function RatioBlocks<T extends string>({
 }) {
   return (
     <div>
-      {label ? <p className="mb-2 text-[12px] font-semibold text-muted-foreground">{label}</p> : null}
+      {label ? (
+        <p className="mb-2 text-[12px] font-semibold text-muted-foreground">{label}</p>
+      ) : null}
       <div className="-mx-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex w-max snap-x snap-mandatory gap-2">
           {options.map((o) => (
@@ -166,7 +170,9 @@ export function Chips({
 }) {
   return (
     <div>
-      {label ? <p className="mb-2 text-[12px] font-semibold text-muted-foreground">{label}</p> : null}
+      {label ? (
+        <p className="mb-2 text-[12px] font-semibold text-muted-foreground">{label}</p>
+      ) : null}
       <div className="-mx-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex w-max snap-x snap-mandatory gap-2">
           {options.map((o) => {
@@ -323,7 +329,9 @@ export function Panel({
             )}
           />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-tight">{title}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-tight">
+          {title}
+        </span>
         <span
           className={cn(
             "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all",
@@ -333,12 +341,17 @@ export function Panel({
           )}
         >
           <ChevronDown
-            className={cn("h-4 w-4 transition-transform duration-200", open ? "rotate-0" : "-rotate-90")}
+            className={cn(
+              "h-4 w-4 transition-transform duration-200",
+              open ? "rotate-0" : "-rotate-90",
+            )}
             strokeWidth={2.25}
           />
         </span>
       </button>
-      {open ? <div className="space-y-3.5 border-t border-border px-3.5 py-3.5">{children}</div> : null}
+      {open ? (
+        <div className="space-y-3.5 border-t border-border px-3.5 py-3.5">{children}</div>
+      ) : null}
     </div>
   );
 }

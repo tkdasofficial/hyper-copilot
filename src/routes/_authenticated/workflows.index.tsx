@@ -71,7 +71,11 @@ function statusTone(workflow: {
   lastRunStatus: string | null;
   enabled: boolean;
 }): StatusTone {
-  if (workflow.runState === "requested" || workflow.runState === "rendering" || workflow.runState === "retry") {
+  if (
+    workflow.runState === "requested" ||
+    workflow.runState === "rendering" ||
+    workflow.runState === "retry"
+  ) {
     return "processing";
   }
   if (workflow.lastRunStatus === "failed") return "error";
@@ -107,7 +111,9 @@ function WorkflowsPage() {
   });
 
   const [runningId, setRunningId] = useState<string | null>(null);
-  const [deletingWorkflow, setDeletingWorkflow] = useState<{ id: string; name: string } | null>(null);
+  const [deletingWorkflow, setDeletingWorkflow] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const [deleteConfirm, setDeleteConfirm] = useState("");
 
   const providerOf = useMemo(() => {
@@ -208,7 +214,9 @@ function WorkflowsPage() {
                               setRunningId(workflow.id);
                               try {
                                 await run({ data: { id: workflow.id } });
-                                toast.success("Run started \u2014 it will publish in the background");
+                                toast.success(
+                                  "Run started \u2014 it will publish in the background",
+                                );
                                 refresh();
                               } catch (err) {
                                 toast.error(err instanceof Error ? err.message : "Run failed");
@@ -226,7 +234,9 @@ function WorkflowsPage() {
                           </DropdownMenuItem>
                         ) : null}
                         <DropdownMenuItem
-                          onClick={() => navigate({ to: "/workflows/create", search: { id: workflow.id } })}
+                          onClick={() =>
+                            navigate({ to: "/workflows/create", search: { id: workflow.id } })
+                          }
                         >
                           <Settings className="size-4" />
                           <span>Edit</span>
@@ -256,7 +266,8 @@ function WorkflowsPage() {
           <DialogHeader>
             <DialogTitle>Delete workflow?</DialogTitle>
             <DialogDescription>
-              This cannot be undone. Type <span className="font-semibold">Delete</span> below to confirm.
+              This cannot be undone. Type <span className="font-semibold">Delete</span> below to
+              confirm.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">

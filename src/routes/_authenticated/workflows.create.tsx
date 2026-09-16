@@ -2,7 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AtSign, CalendarDays, Check, ChevronDown, Facebook, Instagram, Loader2, Plus, Sparkles, X, Youtube } from "lucide-react";
+import {
+  AtSign,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Facebook,
+  Instagram,
+  Loader2,
+  Plus,
+  Sparkles,
+  X,
+  Youtube,
+} from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { StudioLayout } from "@/components/hyper/StudioLayout";
@@ -80,9 +92,17 @@ function TimePicker({ onAdd }: { onAdd: (slot: string) => void }) {
 
   return (
     <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2">
-      <SelectControl value={String(hour)} options={HOURS.map(String)} onChange={(value) => setHour(Number(value))} />
+      <SelectControl
+        value={String(hour)}
+        options={HOURS.map(String)}
+        onChange={(value) => setHour(Number(value))}
+      />
       <SelectControl value={minute} options={MINUTES} onChange={setMinute} />
-      <SelectControl value={meridiem} options={["AM", "PM"]} onChange={(value) => setMeridiem(value as "AM" | "PM")} />
+      <SelectControl
+        value={meridiem}
+        options={["AM", "PM"]}
+        onChange={(value) => setMeridiem(value as "AM" | "PM")}
+      />
       <Button
         type="button"
         variant="outline"
@@ -152,7 +172,10 @@ function SelectControl({
           <ChevronDown className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] min-w-36 p-1.5">
+      <PopoverContent
+        align="start"
+        className="w-[var(--radix-popover-trigger-width)] min-w-36 p-1.5"
+      >
         <div className="max-h-64 overflow-y-auto" role="listbox" aria-label="Choose an option">
           {options.map((option) => (
             <Button
@@ -191,7 +214,11 @@ function DatePicker({ value, onChange }: { value: string; onChange: (value: stri
         >
           <span className={value ? "text-foreground" : "text-muted-foreground"}>
             {selected
-              ? selected.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+              ? selected.toLocaleDateString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
               : "Choose date"}
           </span>
           <CalendarDays className="text-muted-foreground" />
@@ -215,11 +242,24 @@ function DatePicker({ value, onChange }: { value: string; onChange: (value: stri
   );
 }
 
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
   return (
     <div className="flex items-center gap-2.5">
       <span className="min-w-6 text-right text-xs font-bold">{label}</span>
-      <Switch checked={checked} onCheckedChange={onChange} aria-label={label} className="h-6 w-11 [&>span]:size-5 data-[state=checked]:[&>span]:translate-x-5" />
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
+        aria-label={label}
+        className="h-6 w-11 [&>span]:size-5 data-[state=checked]:[&>span]:translate-x-5"
+      />
     </div>
   );
 }
@@ -311,36 +351,59 @@ function CreateWorkflowPage() {
           <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3.5">
             <div>
               <p className="text-sm font-semibold">Workflow status</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{enabled ? "Automation is active" : "Automation is paused"}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {enabled ? "Automation is active" : "Automation is paused"}
+              </p>
             </div>
             <Toggle checked={enabled} onChange={setEnabled} label={enabled ? "On" : "Off"} />
           </div>
 
-          <section className="space-y-4 rounded-3xl border border-border bg-surface p-4" aria-label="Workflow details">
-          <Field label="Workflow name">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Daily cosmic story"
-              className={inputClass}
-            />
-          </Field>
+          <section
+            className="space-y-4 rounded-3xl border border-border bg-surface p-4"
+            aria-label="Workflow details"
+          >
+            <Field label="Workflow name">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Daily cosmic story"
+                className={inputClass}
+              />
+            </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Trigger">
-              <SelectControl value={triggerType} options={TRIGGERS} labels={TRIGGER_LABELS} onChange={(value) => setTriggerType(value as TriggerType)} />
-            </Field>
-            <Field label="What it publishes">
-              <SelectControl value={actionType} options={ACTIONS} labels={ACTION_LABELS} onChange={(value) => setActionType(value as ActionType)} />
-            </Field>
-          </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Trigger">
+                <SelectControl
+                  value={triggerType}
+                  options={TRIGGERS}
+                  labels={TRIGGER_LABELS}
+                  onChange={(value) => setTriggerType(value as TriggerType)}
+                />
+              </Field>
+              <Field label="What it publishes">
+                <SelectControl
+                  value={actionType}
+                  options={ACTIONS}
+                  labels={ACTION_LABELS}
+                  onChange={(value) => setActionType(value as ActionType)}
+                />
+              </Field>
+            </div>
           </section>
 
           {scheduled ? (
-            <section className="space-y-4 rounded-3xl border border-border bg-surface p-4" aria-label="Schedule">
+            <section
+              className="space-y-4 rounded-3xl border border-border bg-surface p-4"
+              aria-label="Schedule"
+            >
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Frequency">
-                  <SelectControl value={repeatRule} options={REPEATS} labels={REPEAT_LABELS} onChange={(value) => setRepeatRule(value as RepeatRule)} />
+                  <SelectControl
+                    value={repeatRule}
+                    options={REPEATS}
+                    labels={REPEAT_LABELS}
+                    onChange={(value) => setRepeatRule(value as RepeatRule)}
+                  />
                 </Field>
                 <Field label="Starts on">
                   <DatePicker value={startDate} onChange={setStartDate} />
@@ -378,76 +441,79 @@ function CreateWorkflowPage() {
             </section>
           ) : null}
 
-          <section className="space-y-4 rounded-3xl border border-border bg-surface p-4" aria-label="Content and destination">
-          <Field label="Instruction">
-            <textarea
-              value={instruction}
-              onChange={(e) => setInstruction(e.target.value)}
-              rows={3}
-              placeholder="Describe what the post should say or show"
-              className={`${inputClass} resize-none`}
-            />
-          </Field>
+          <section
+            className="space-y-4 rounded-3xl border border-border bg-surface p-4"
+            aria-label="Content and destination"
+          >
+            <Field label="Instruction">
+              <textarea
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                rows={3}
+                placeholder="Describe what the post should say or show"
+                className={`${inputClass} resize-none`}
+              />
+            </Field>
 
-          {videoAction ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setCustomizing(true)}
-              className="h-auto min-h-12 w-full justify-start rounded-full px-4 py-2.5"
-            >
-              <Sparkles /> <span className="font-semibold">Customize Creation</span>
-              <span className="ml-auto truncate text-right text-[11px] font-medium text-muted-foreground">
-                {creation.category} · {creation.durationSeconds}s · {creation.aspectRatio}
-              </span>
-            </Button>
-          ) : null}
+            {videoAction ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCustomizing(true)}
+                className="h-auto min-h-12 w-full justify-start rounded-full px-4 py-2.5"
+              >
+                <Sparkles /> <span className="font-semibold">Customize Creation</span>
+                <span className="ml-auto truncate text-right text-[11px] font-medium text-muted-foreground">
+                  {creation.category} · {creation.durationSeconds}s · {creation.aspectRatio}
+                </span>
+              </Button>
+            ) : null}
 
-          <div className="space-y-2">
-            <span className={labelClass}>Publish to</span>
-            {accounts.length === 0 ? (
-              <p className="text-[12px] text-muted-foreground">
-                Connect an account on the Integrations page first.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {accounts.map((account) => {
-                  const Icon = ICONS[account.provider as SocialProvider] ?? Facebook;
-                  const active = targets.includes(account.id);
-                  return (
-                    <Button
-                      key={account.id}
-                      type="button"
-                      variant={active ? "default" : "outline"}
-                      size="sm"
-                      onClick={() =>
-                        setTargets((list) =>
-                          active ? list.filter((t) => t !== account.id) : [...list, account.id],
-                        )
-                      }
-                      className="rounded-full"
-                    >
-                      <Icon className="size-3.5" />
-                      {account.displayName ?? account.provider}
-                      {active ? <Check className="size-3.5" /> : null}
-                    </Button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+            <div className="space-y-2">
+              <span className={labelClass}>Publish to</span>
+              {accounts.length === 0 ? (
+                <p className="text-[12px] text-muted-foreground">
+                  Connect an account on the Integrations page first.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {accounts.map((account) => {
+                    const Icon = ICONS[account.provider as SocialProvider] ?? Facebook;
+                    const active = targets.includes(account.id);
+                    return (
+                      <Button
+                        key={account.id}
+                        type="button"
+                        variant={active ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setTargets((list) =>
+                            active ? list.filter((t) => t !== account.id) : [...list, account.id],
+                          )
+                        }
+                        className="rounded-full"
+                      >
+                        <Icon className="size-3.5" />
+                        {account.displayName ?? account.provider}
+                        {active ? <Check className="size-3.5" /> : null}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </section>
 
           <div className="pt-2">
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={submit}
-            className="h-12 w-full rounded-full text-sm font-bold"
-          >
-            {busy ? <Loader2 className="animate-spin" /> : null}
-            {id ? "Save workflow" : "Create workflow"}
-          </Button>
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={submit}
+              className="h-12 w-full rounded-full text-sm font-bold"
+            >
+              {busy ? <Loader2 className="animate-spin" /> : null}
+              {id ? "Save workflow" : "Create workflow"}
+            </Button>
           </div>
         </div>
       </div>
@@ -504,7 +570,13 @@ function CreateWorkflowPage() {
                   onChange={(aspectRatio) => setCreation({ ...creation, aspectRatio })}
                 />
                 <Field label="Length">
-                  <SelectControl value={`${creation.durationSeconds}s`} options={CREATION_DURATIONS.map((seconds) => `${seconds}s`)} onChange={(value) => setCreation({ ...creation, durationSeconds: Number(value.replace("s", "")) })} />
+                  <SelectControl
+                    value={`${creation.durationSeconds}s`}
+                    options={CREATION_DURATIONS.map((seconds) => `${seconds}s`)}
+                    onChange={(value) =>
+                      setCreation({ ...creation, durationSeconds: Number(value.replace("s", "")) })
+                    }
+                  />
                 </Field>
                 <Picker
                   label="Quality"
@@ -539,7 +611,11 @@ function CreateWorkflowPage() {
               </div>
               <div className="flex items-center justify-between rounded-2xl border border-border p-3">
                 <span className="text-sm font-semibold">Captions</span>
-                <Toggle checked={creation.captions} onChange={(captions) => setCreation({ ...creation, captions })} label={creation.captions ? "On" : "Off"} />
+                <Toggle
+                  checked={creation.captions}
+                  onChange={(captions) => setCreation({ ...creation, captions })}
+                  label={creation.captions ? "On" : "Off"}
+                />
               </div>
               {creation.captions ? (
                 <div className="space-y-3 rounded-2xl border border-border p-3">
@@ -550,7 +626,10 @@ function CreateWorkflowPage() {
                   <Slider
                     value={[creation.captionScale]}
                     onValueChange={([value]) =>
-                      setCreation({ ...creation, captionScale: Math.min(10, Math.max(1, Math.round(value ?? 4))) })
+                      setCreation({
+                        ...creation,
+                        captionScale: Math.min(10, Math.max(1, Math.round(value ?? 4))),
+                      })
                     }
                     min={1}
                     max={10}

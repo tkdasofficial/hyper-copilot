@@ -4,6 +4,5 @@ export {
   SUPABASE_PUBLISHABLE_KEY,
   SUPABASE_REF_ID,
   type Database,
+  supabase,
 } from "./config/config";
-
-export { supabase } from "@/integrations/supabase/client";

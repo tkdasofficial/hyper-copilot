@@ -32,6 +32,8 @@
     "noUncheckedSideEffectImports": true,
     "paths": {
       "@/*": ["./src/*"],
+      "config": ["./supabase/config/config.ts"],
+      "@/config": ["./src/config.ts"],
       "supabase-config": ["./supabase/config/config.ts"]
     }
   }

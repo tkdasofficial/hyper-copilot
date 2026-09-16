@@ -1,12 +1,6 @@
 /** Client-safe types for the background job queue. */
 
-export type JobKind =
-  | "image"
-  | "video"
-  | "speech"
-  | "music"
-  | "virtual-model"
-  | "character-image";
+export type JobKind = "image" | "video" | "speech" | "music" | "virtual-model" | "character-image";
 
 export type JobStatus = "queued" | "running" | "completed" | "failed" | "canceled";
 

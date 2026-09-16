@@ -39,7 +39,12 @@ export function RecentCreations() {
               className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-surface"
             >
               {item.kind === "video" ? (
-                <video src={item.url!} controls playsInline className="h-full w-full object-cover" />
+                <video
+                  src={item.url!}
+                  controls
+                  playsInline
+                  className="h-full w-full object-cover"
+                />
               ) : item.kind === "audio" ? (
                 <div className="flex h-full w-full flex-col justify-center gap-3 p-4">
                   <p className="line-clamp-4 text-[12px] text-muted-foreground">{item.prompt}</p>

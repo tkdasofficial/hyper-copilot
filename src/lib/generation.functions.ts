@@ -19,9 +19,8 @@ export const uploadReference = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { dataUrl: string }) => input)
   .handler(async ({ data, context }) => {
-    const { dataUrlToBytes, uploadBytes, referenceUrl, GENERATIONS_BUCKET } = await import(
-      "@/lib/storage.server"
-    );
+    const { dataUrlToBytes, uploadBytes, referenceUrl, GENERATIONS_BUCKET } =
+      await import("@/lib/storage.server");
     const { bytes, contentType } = dataUrlToBytes(data.dataUrl);
     const path = await uploadBytes(GENERATIONS_BUCKET, context.userId, bytes, contentType);
     // Providers reject reference images over 1MB, so hand them a compressed

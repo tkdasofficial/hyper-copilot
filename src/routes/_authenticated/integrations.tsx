@@ -18,7 +18,12 @@ export const Route = createFileRoute("/_authenticated/integrations")({
       description:
         "Link your Facebook Page, Instagram Business account and Threads profile to publish and automate directly from Hyper Copilot.",
       noindex: true,
-      keywords: ["social integrations", "connect Instagram", "connect Facebook Page", "Threads API"],
+      keywords: [
+        "social integrations",
+        "connect Instagram",
+        "connect Facebook Page",
+        "Threads API",
+      ],
     }),
   component: IntegrationsPage,
 });
@@ -68,10 +73,7 @@ function IntegrationsPage() {
           const busy = isYouTube ? youtube.pending : pending === provider.id;
 
           return (
-            <section
-              key={provider.id}
-              className="rounded-2xl border border-border bg-surface p-4"
-            >
+            <section key={provider.id} className="rounded-2xl border border-border bg-surface p-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-2">
                   <Icon className="h-[17px] w-[17px]" strokeWidth={1.9} />

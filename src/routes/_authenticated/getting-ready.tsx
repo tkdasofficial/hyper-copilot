@@ -15,9 +15,7 @@ export const Route = createFileRoute("/_authenticated/getting-ready")({
       description:
         "Tell us your name, role and what you plan to create so we can tailor your studio.",
       noindex: true,
-      keywords: [
-        "Hyper Copilot onboarding",
-      ],
+      keywords: ["Hyper Copilot onboarding"],
     }),
   component: GettingReady,
 });

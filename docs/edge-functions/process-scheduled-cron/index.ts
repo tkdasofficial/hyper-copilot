@@ -3,7 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.48.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-worker-secret",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-worker-secret",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
@@ -177,11 +178,14 @@ export async function processScheduledWorkflows(options?: {
   return { processedCount: reports.length, reports };
 }
 
-
 // --- Backend-only access guard (added by Lovable) ---
 async function assertBackendCaller(req: Request): Promise<Response | null> {
   const url = new URL(req.url);
-  const token = (req.headers.get("x-worker-secret") ?? url.searchParams.get("worker_secret") ?? "").trim();
+  const token = (
+    req.headers.get("x-worker-secret") ??
+    url.searchParams.get("worker_secret") ??
+    ""
+  ).trim();
   const serviceKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
   const auth = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
 
@@ -229,7 +233,8 @@ Deno.serve(async (req: Request) => {
       }
     } else if (req.method === "GET") {
       const url = new URL(req.url);
-      workflowId = url.searchParams.get("workflowId") || url.searchParams.get("workflow_id") || undefined;
+      workflowId =
+        url.searchParams.get("workflowId") || url.searchParams.get("workflow_id") || undefined;
       force = url.searchParams.get("force") === "true";
     }
 

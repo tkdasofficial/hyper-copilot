@@ -3,7 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.48.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-worker-secret",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-worker-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -12,7 +13,13 @@ const EDGE_TTS_URL =
 
 const DEFAULT_VOICE = "en-US-ChristopherNeural";
 
-function generateSSML(text: string, voice: string, rate = "+0%", pitch = "+0Hz", volume = "+0%"): string {
+function generateSSML(
+  text: string,
+  voice: string,
+  rate = "+0%",
+  pitch = "+0Hz",
+  volume = "+0%",
+): string {
   return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
   <voice name='${voice}'>
     <prosody pitch='${pitch}' rate='${rate}' volume='${volume}'>
@@ -122,11 +129,14 @@ function synthesizeWithEdgeTTS(ssml: string): Promise<Uint8Array> {
   });
 }
 
-
 // --- Backend-only access guard (added by Lovable) ---
 async function assertBackendCaller(req: Request): Promise<Response | null> {
   const url = new URL(req.url);
-  const token = (req.headers.get("x-worker-secret") ?? url.searchParams.get("worker_secret") ?? "").trim();
+  const token = (
+    req.headers.get("x-worker-secret") ??
+    url.searchParams.get("worker_secret") ??
+    ""
+  ).trim();
   const serviceKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
   const auth = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
 
@@ -204,7 +214,11 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-    if ((mode === "link" || body.upload === true || body.store === true) && supabaseUrl && supabaseServiceKey) {
+    if (
+      (mode === "link" || body.upload === true || body.store === true) &&
+      supabaseUrl &&
+      supabaseServiceKey
+    ) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
       const userId = body.userId || body.user_id || "public";
       const fileName = `${userId}/${crypto.randomUUID()}.mp3`;

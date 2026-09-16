@@ -8,7 +8,12 @@ import { providerInfo, type SocialProvider } from "@/lib/social.shared";
 const RESULT_KEY = "metaOAuthResult";
 const PENDING_KEY = "metaOAuthPending";
 
-type OAuthResult = { code?: string | null; state?: string | null; error?: string | null; at?: number };
+type OAuthResult = {
+  code?: string | null;
+  state?: string | null;
+  error?: string | null;
+  at?: number;
+};
 type PendingRequest = { provider: SocialProvider; redirectUri: string; state: string };
 
 function readResult(): OAuthResult | null {
@@ -31,10 +36,9 @@ function clearStored() {
 
 function waitForCode(popup: Window, state: string) {
   return new Promise<string>((resolve, reject) => {
-    let poll: number | undefined;
     const cleanup = () => {
       window.removeEventListener("message", onMessage);
-      if (poll !== undefined) window.clearInterval(poll);
+      window.clearInterval(poll);
     };
     const settle = (result: OAuthResult) => {
       cleanup();
@@ -48,7 +52,7 @@ function waitForCode(popup: Window, state: string) {
       settle(event.data as OAuthResult);
     };
     window.addEventListener("message", onMessage);
-    poll = window.setInterval(() => {
+    const poll = window.setInterval(() => {
       const stored = readResult();
       if (stored && stored.state === state) {
         settle(stored);
@@ -184,7 +188,6 @@ export function useMetaConnect() {
           }
         }, 1500);
       }
-
     },
     [config.data, finish],
   );

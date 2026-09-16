@@ -15,12 +15,7 @@ export type VirtualModelRecord = {
   createdAt: string;
 };
 
-export type ViewId =
-  | "headshot"
-  | "front-full"
-  | "back-full"
-  | "left-profile"
-  | "right-profile";
+export type ViewId = "headshot" | "front-full" | "back-full" | "left-profile" | "right-profile";
 
 /**
  * The five profile views generated for every character.
@@ -239,7 +234,7 @@ export type SceneSettings = {
 const BACKGROUNDS: Record<string, string> = {
   studio: "in a professional photo studio against a clean seamless backdrop",
   city: "on a busy city street with buildings, traffic and pedestrians behind her",
-  "café": "inside a cosy café with tables, cups and warm interior details behind her",
+  café: "inside a cosy café with tables, cups and warm interior details behind her",
   cafe: "inside a cosy café with tables, cups and warm interior details behind her",
   beach: "on a sandy beach with the sea, surf and open sky behind her",
   rooftop: "on an open city rooftop with a skyline horizon behind her",
@@ -251,11 +246,14 @@ const BACKGROUNDS: Record<string, string> = {
 const LIGHTING: Record<string, string> = {
   softbox: "soft even softbox studio lighting, gentle wrap-around light, minimal shadows",
   "golden hour": "warm golden hour sunlight, low sun, long soft shadows, glowing skin",
-  rembrandt: "dramatic Rembrandt lighting, strong key light from one side, triangle of light on the cheek, deep contrast",
+  rembrandt:
+    "dramatic Rembrandt lighting, strong key light from one side, triangle of light on the cheek, deep contrast",
   ring: "ring light beauty lighting, flat frontal illumination, circular catchlights in the eyes",
   neon: "coloured neon lighting, magenta and cyan colour cast, moody night ambience",
-  flash: "direct on-camera flash, harsh frontal light, crisp shadow behind the subject, snapshot look",
-  backlit: "strong backlight behind the subject, glowing rim light around hair and shoulders, hazy lens flare",
+  flash:
+    "direct on-camera flash, harsh frontal light, crisp shadow behind the subject, snapshot look",
+  backlit:
+    "strong backlight behind the subject, glowing rim light around hair and shoulders, hazy lens flare",
 };
 
 /** Focal-length look — a lens choice must change compression and background blur. */
@@ -309,7 +307,9 @@ export function sceneClauses(s: SceneSettings) {
     outfit.length
       ? `wearing a complete ${outfit.join(" and ").toLowerCase()} outfit, the clothing is clearly visible and well fitted`
       : "",
-    acc.length ? `wearing ${acc.join(", ").toLowerCase()}, the accessories are clearly visible` : "",
+    acc.length
+      ? `wearing ${acc.join(", ").toLowerCase()}, the accessories are clearly visible`
+      : "",
     bgKey ? (BACKGROUNDS[bgKey] ?? `${bgKey} background`) : "",
     lightKey ? (LIGHTING[lightKey] ?? `${lightKey} lighting`) : "",
     lensClause(s.lens, s.depth),
@@ -330,7 +330,8 @@ export function sceneNegative(s: SceneSettings) {
         ? "plain studio backdrop, empty grey wall"
         : "";
   const d = clamp(s.depth ?? 35, 0, 100);
-  const dofNeg = d >= 60 ? "sharp busy background" : d <= 20 ? "blurry background, heavy bokeh" : "";
+  const dofNeg =
+    d >= 60 ? "sharp busy background" : d <= 20 ? "blurry background, heavy bokeh" : "";
   return [unwanted.length ? unwanted.join(", ") : "", bgNeg, dofNeg].filter(Boolean).join(", ");
 }
 
@@ -375,5 +376,3 @@ export function renderPrompt(input: {
     .filter(Boolean)
     .join(". ");
 }
-
-

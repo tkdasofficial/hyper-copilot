@@ -129,7 +129,11 @@ export function sanitizeText(raw: string | null | undefined): string {
 /** Sanitizes and reduces text to one punchy line of at most `max` chars. */
 export function oneLine(text: string | null | undefined, max = 120): string {
   const clean = sanitizeText(text);
-  const first = clean.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
+  const first =
+    clean
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find(Boolean) ?? "";
   const sentence = first.split(/(?<=[.!?])\s/)[0] ?? first;
   const picked = sentence.length >= 20 ? sentence : first;
   return picked.length > max ? `${picked.slice(0, max - 1).trimEnd()}…` : picked;
@@ -141,16 +145,15 @@ export function oneLine(text: string | null | undefined, max = 120): string {
 
 /** Normalises loose input into `#tag` form and drops duplicates/blanks. */
 export function normalizeHashtags(input: unknown, limit = 15): string[] {
-  const raw = Array.isArray(input)
-    ? input
-    : typeof input === "string"
-      ? input.split(/[\s,]+/)
-      : [];
+  const raw = Array.isArray(input) ? input : typeof input === "string" ? input.split(/[\s,]+/) : [];
   const seen = new Set<string>();
   const out: string[] = [];
   for (const item of raw) {
     if (typeof item !== "string") continue;
-    const tag = item.trim().replace(/^#+/, "").replace(/[^\p{L}\p{N}_]/gu, "");
+    const tag = item
+      .trim()
+      .replace(/^#+/, "")
+      .replace(/[^\p{L}\p{N}_]/gu, "");
     if (!tag) continue;
     const key = `#${tag}`.toLowerCase();
     if (seen.has(key)) continue;
@@ -198,10 +201,7 @@ const THREADS_MAX = 500;
 
 function hookOf(source: ContentSource): string {
   return (
-    oneLine(source.hookTitle) ||
-    oneLine(source.caption) ||
-    oneLine(source.name) ||
-    FALLBACK_HOOK
+    oneLine(source.hookTitle) || oneLine(source.caption) || oneLine(source.name) || FALLBACK_HOOK
   );
 }
 

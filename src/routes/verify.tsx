@@ -3,7 +3,7 @@ import { pageHead } from "@/lib/seo";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MailCheck, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/config";
 import { Logo } from "@/components/hyper/Logo";
 
 export const Route = createFileRoute("/verify")({
@@ -15,10 +15,7 @@ export const Route = createFileRoute("/verify")({
       description:
         "Confirm your email address to activate your Hyper Copilot account and start generating.",
       noindex: true,
-      keywords: [
-        "Hyper Copilot email verification",
-        "activate AI account",
-      ],
+      keywords: ["Hyper Copilot email verification", "activate AI account"],
     }),
   component: VerifyPage,
 });
@@ -93,7 +90,10 @@ function VerifyPage() {
 
         <p className="mt-4 text-[12px] text-muted-foreground">
           Wrong address?{" "}
-          <Link to="/auth" className="font-semibold text-foreground underline-offset-4 hover:underline">
+          <Link
+            to="/auth"
+            className="font-semibold text-foreground underline-offset-4 hover:underline"
+          >
             Use another email
           </Link>
         </p>

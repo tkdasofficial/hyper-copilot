@@ -22,7 +22,8 @@ export type ArtStyle = (typeof ART_STYLES)[number];
 const IMAGE_STYLE_PROMPTS: Record<ImageStyle, string> = {
   Photorealistic: "realistic photography with natural colors and true-to-life materials",
   "Cinematic Film": "cinematic film photography with balanced framing and subtle film grain",
-  "Studio Photography": "professional studio photography with a clean backdrop and controlled lighting",
+  "Studio Photography":
+    "professional studio photography with a clean backdrop and controlled lighting",
   "Digital Art": "polished digital artwork with clear forms and balanced color",
   "3D Animation": "professional 3D animation with clean materials and believable lighting",
   "Vintage Kodak": "vintage Kodak film photography with gentle grain and authentic color",

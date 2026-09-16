@@ -7,7 +7,7 @@
  * work — the result lands in the user's library and tasks panel.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/config";
 import { enqueueJob, getJob } from "@/lib/jobs.functions";
 import type { JobKind, JobRecord } from "@/lib/jobs.shared";
 

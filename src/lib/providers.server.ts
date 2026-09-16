@@ -84,8 +84,7 @@ export async function pixazoStableDiffusion(input: {
     guidance: input.guidance ?? 7.5,
     ...(input.seed === undefined ? {} : { seed: input.seed }),
   };
-  const withStrength =
-    input.strength === undefined ? base : { ...base, strength: input.strength };
+  const withStrength = input.strength === undefined ? base : { ...base, strength: input.strength };
 
   let data: { imageUrl?: string; output?: string };
   try {
@@ -95,7 +94,8 @@ export async function pixazoStableDiffusion(input: {
     // Retrying rate limits, oversized inputs, auth failures, or provider faults
     // here both duplicates work and silently drops the user's influence setting.
     const message = err instanceof Error ? err.message : "";
-    const unsupportedField = /\((400|422)\)/.test(message) && /strength|unknown|unsupported|field|schema/i.test(message);
+    const unsupportedField =
+      /\((400|422)\)/.test(message) && /strength|unknown|unsupported|field|schema/i.test(message);
     if (input.strength === undefined || !unsupportedField) throw err;
     data = await pixazoPost("/inpainting/v1/getImage", base);
   }
@@ -136,7 +136,6 @@ export async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<
   }
   throw lastError instanceof Error ? lastError : new Error("Generation failed");
 }
-
 
 /** Hyper Image Speed — Flux 1 Schnell (text-to-image only). */
 export async function pixazoFluxSchnell(input: {
@@ -192,8 +191,6 @@ export async function pixazoImage(input: {
   );
 }
 
-
-
 /** Hyper Video Omni — LTX free tier. Returns an async job id. */
 export async function pixazoStartVideo(input: {
   prompt: string;
@@ -237,7 +234,6 @@ export async function pixazoStartVideo(input: {
   if (!data.request_id) throw new Error("Video provider returned no job id");
   return data.request_id;
 }
-
 
 export type VideoJob = { status: string; url?: string | undefined; error?: string | undefined };
 

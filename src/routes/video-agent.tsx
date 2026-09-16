@@ -15,7 +15,7 @@ import {
 } from "@/components/hyper/StudioControls";
 import { RecentCreations } from "@/components/hyper/RecentCreations";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/config";
 import { getVideoPlaybackUrl, startVideoRender } from "@/lib/video-agent.functions";
 import { cn } from "@/lib/utils";
 import {
@@ -153,7 +153,7 @@ function Console({ lines }: { lines: LogLine[] }) {
           {l.text}
         </p>
       ))}
-        <div ref={endRef} />
+      <div ref={endRef} />
     </div>
   );
 }
@@ -444,27 +444,27 @@ function VideoAgent() {
         </div>
 
         <Panel title="Theme" summary={activeTheme.name}>
-            <div className="grid grid-cols-2 gap-2">
-              {storyThemes.map((t) => {
-                const active = t.id === theme;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => applyTheme(t)}
-                    className={cn(
-                      "rounded-2xl border px-3 py-2.5 text-left transition-colors",
-                      active
-                        ? "border-foreground/25 bg-surface-2 text-foreground"
-                        : "border-border bg-background text-muted-foreground hover:border-border-strong hover:bg-surface-2/60",
-                    )}
-                  >
-                    <span className="block text-[12.5px] font-bold">{t.name}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            {storyThemes.map((t) => {
+              const active = t.id === theme;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => applyTheme(t)}
+                  className={cn(
+                    "rounded-2xl border px-3 py-2.5 text-left transition-colors",
+                    active
+                      ? "border-foreground/25 bg-surface-2 text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:border-border-strong hover:bg-surface-2/60",
+                  )}
+                >
+                  <span className="block text-[12.5px] font-bold">{t.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </Panel>
 
         <Panel title="Video length" summary={`${duration} seconds`}>
@@ -512,19 +512,11 @@ function VideoAgent() {
         </Panel>
 
         <Panel title="Image style" summary={imageStyle}>
-          <Segment
-            options={imageStyles}
-            value={imageStyle}
-            onChange={setImageStyle}
-          />
+          <Segment options={imageStyles} value={imageStyle} onChange={setImageStyle} />
         </Panel>
 
         <Panel title="Camera motion" summary={motion}>
-          <Segment
-            options={motionTemplates}
-            value={motion}
-            onChange={setMotion}
-          />
+          <Segment options={motionTemplates} value={motion} onChange={setMotion} />
         </Panel>
 
         <Panel title="Narrator" summary={`${gender} · ${preset}`}>
@@ -538,7 +530,14 @@ function VideoAgent() {
         </Panel>
 
         <Panel title="Voice speed" summary={`${speed}%`}>
-          <SliderRow label="Speed" value={speed} onChange={setSpeed} min={50} max={150} suffix="%" />
+          <SliderRow
+            label="Speed"
+            value={speed}
+            onChange={setSpeed}
+            min={50}
+            max={150}
+            suffix="%"
+          />
         </Panel>
 
         <Panel title="Voice pitch" summary={`${pitch}%`}>
@@ -546,11 +545,7 @@ function VideoAgent() {
         </Panel>
 
         <Panel title="Captions" summary={captions ? `${captionTemplate} · ${captionScale}` : "Off"}>
-          <SwitchRow
-            label="Captions"
-            checked={captions}
-            onCheckedChange={setCaptions}
-          />
+          <SwitchRow label="Captions" checked={captions} onCheckedChange={setCaptions} />
           <SelectRow
             label="Caption template"
             value={captionTemplate}

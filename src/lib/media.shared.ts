@@ -2,7 +2,11 @@
 
 export const TTS_MODELS = [
   { id: "google/gemini-2.5-flash-tts", name: "Hyper Audio Omni", note: "Balanced speech" },
-  { id: "google/gemini-2.5-pro-tts", name: "Hyper Audio Omni Pro", note: "Highest fidelity speech" },
+  {
+    id: "google/gemini-2.5-pro-tts",
+    name: "Hyper Audio Omni Pro",
+    note: "Highest fidelity speech",
+  },
   {
     id: "google/gemini-3.1-flash-tts-preview",
     name: "Hyper Audio Omni Next",

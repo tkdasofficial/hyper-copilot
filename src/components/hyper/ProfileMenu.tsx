@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreditCard, FileText, Settings, ShieldCheck, LogOut, LogIn, User } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/config";
 import { useSession } from "@/hooks/useSession";
 import { endGuest, useGuest } from "@/lib/guest";
 import {
@@ -35,7 +35,7 @@ export function ProfileMenu() {
   const { user } = useSession();
 
   const guest = useGuest();
-  const name = (user?.user_metadata?.['full_name'] as string | undefined) ?? user?.email ?? "Guest";
+  const name = (user?.user_metadata?.["full_name"] as string | undefined) ?? user?.email ?? "Guest";
   const initials = user ? initialsFor(name) : null;
 
   async function handleSignOut() {

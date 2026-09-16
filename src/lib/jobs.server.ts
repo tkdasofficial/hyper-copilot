@@ -23,7 +23,12 @@ export type JobRow = {
 
 export type StepOutcome =
   | { done: true; result: JobResult; generationId?: string | null }
-  | { done: false; state: Record<string, unknown>; delaySeconds: number; generationId?: string | null };
+  | {
+      done: false;
+      state: Record<string, unknown>;
+      delaySeconds: number;
+      generationId?: string | null;
+    };
 
 const asString = (v: unknown) => (typeof v === "string" ? v : undefined);
 const asNumber = (v: unknown) => (typeof v === "number" ? v : undefined);
@@ -59,7 +64,13 @@ export async function runImage(
 
   const aspect = data.aspect ?? "1:1";
   const resolutionBase =
-    data.resolution === "1K" ? 896 : data.resolution === "4K" ? 1280 : data.resolution === "8K" ? 1408 : 1088;
+    data.resolution === "1K"
+      ? 896
+      : data.resolution === "4K"
+        ? 1280
+        : data.resolution === "8K"
+          ? 1408
+          : 1088;
   const { width, height } = providers.sizeForAspect(aspect, resolutionBase);
   const refs = (data.referenceUrls ?? []).filter(Boolean);
   const styleStrength = Math.max(0, Math.min(100, data.styleStrength ?? 65));
@@ -76,7 +87,9 @@ export async function runImage(
     data.negativePrompt?.trim()
       ? `Exclude all of the following from the image: ${data.negativePrompt.trim()}`
       : "",
-  ].filter(Boolean).join(". ");
+  ]
+    .filter(Boolean)
+    .join(". ");
 
   let storagePath: string;
   try {
@@ -109,7 +122,12 @@ export async function runImage(
         negativePrompt: data.negativePrompt,
         imageUrl: refs[0],
         strength: refs[0]
-          ? Number((0.35 + (1 - Math.max(0, Math.min(100, data.referenceWeight ?? 50)) / 100) * 0.5).toFixed(2))
+          ? Number(
+              (
+                0.35 +
+                (1 - Math.max(0, Math.min(100, data.referenceWeight ?? 50)) / 100) * 0.5
+              ).toFixed(2),
+            )
           : undefined,
       });
       storagePath = await storage.uploadFromUrl(storage.GENERATIONS_BUCKET, userId, url);
@@ -418,19 +436,35 @@ export async function runJobStep(job: JobRow): Promise<StepOutcome> {
   switch (job.kind) {
     case "image": {
       const res = await runImage(job.user_id, input as never);
-      return { done: true, result: { id: res.id, url: res.url, kind: "image" }, generationId: res.id };
+      return {
+        done: true,
+        result: { id: res.id, url: res.url, kind: "image" },
+        generationId: res.id,
+      };
     }
     case "speech": {
       const res = await runSpeech(job.user_id, input as never);
-      return { done: true, result: { id: res.id, url: res.url, kind: "audio" }, generationId: res.id };
+      return {
+        done: true,
+        result: { id: res.id, url: res.url, kind: "audio" },
+        generationId: res.id,
+      };
     }
     case "music": {
       const res = await runMusic(job.user_id, input as never);
-      return { done: true, result: { id: res.id, url: res.url, kind: "audio" }, generationId: res.id };
+      return {
+        done: true,
+        result: { id: res.id, url: res.url, kind: "audio" },
+        generationId: res.id,
+      };
     }
     case "character-image": {
       const res = await runCharacterImage(job.user_id, input);
-      return { done: true, result: { id: res.id, url: res.url, kind: "image" }, generationId: res.id };
+      return {
+        done: true,
+        result: { id: res.id, url: res.url, kind: "image" },
+        generationId: res.id,
+      };
     }
     case "virtual-model": {
       const { buildCharacterProfile } = await import("@/lib/virtual-model.server");
@@ -442,7 +476,6 @@ export async function runJobStep(job: JobRow): Promise<StepOutcome> {
         consistency: asNumber(input["consistency"]),
         style: asString(input["style"]),
         jobId: job.id,
-
       });
       return { done: true, result: { id: res.id, kind: "virtual-model" } };
     }

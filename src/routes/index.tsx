@@ -44,20 +44,20 @@ export const Route = createFileRoute("/")({
       jsonLd: [
         {
           "@type": "SoftwareApplication",
-          "name": "Hyper Copilot",
-          "applicationCategory": "MultimediaApplication",
-          "operatingSystem": "All",
-          "url": "https://hypercopilot.vercel.app/",
-          "offers": {
+          name: "Hyper Copilot",
+          applicationCategory: "MultimediaApplication",
+          operatingSystem: "All",
+          url: "https://hypercopilot.vercel.app/",
+          offers: {
             "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
+            price: "0",
+            priceCurrency: "USD",
           },
-          "creator": {
+          creator: {
             "@type": "Person",
-            "name": "Tushar Kanti Das"
-          }
-        }
+            name: "Tushar Kanti Das",
+          },
+        },
       ],
     }),
 
@@ -138,7 +138,6 @@ function Landing() {
         </div>
       </header>
 
-
       <main className="mx-auto max-w-6xl px-4 pb-24 lg:px-8">
         <section className="relative pt-16 text-center sm:pt-24">
           <div
@@ -216,10 +215,7 @@ function Landing() {
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
             Why Hyper
           </p>
-          <h2
-            id="details"
-            className="mt-2 text-2xl font-extrabold tracking-[-0.02em] sm:text-3xl"
-          >
+          <h2 id="details" className="mt-2 text-2xl font-extrabold tracking-[-0.02em] sm:text-3xl">
             Built for teams that ship
           </h2>
           <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -287,7 +283,6 @@ function Landing() {
             <ArrowRight className="h-4 w-4" strokeWidth={2.2} />
           </Link>
         </section>
-
       </main>
 
       <footer className="border-t border-border">

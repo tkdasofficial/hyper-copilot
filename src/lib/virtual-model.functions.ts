@@ -52,4 +52,3 @@ export const deleteVirtualModel = createServerFn({ method: "POST" })
     await storage.removeFiles(storage.MODELS_BUCKET, paths);
     return { ok: true };
   });
-

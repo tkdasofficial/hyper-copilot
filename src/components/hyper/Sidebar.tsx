@@ -20,7 +20,12 @@ import { Logo } from "./Logo";
 import { VideoAgentIcon } from "./VideoAgentIcon";
 import { cn } from "@/lib/utils";
 
-type Item = { label: string; icon: LucideIcon | React.FC<{ className?: string }>; badge?: string; to?: string };
+type Item = {
+  label: string;
+  icon: LucideIcon | React.FC<{ className?: string }>;
+  badge?: string;
+  to?: string;
+};
 
 const primary: Item[] = [
   { label: "Home", icon: Home, to: "/dashboard" },
@@ -43,7 +48,6 @@ const myWork: Item[] = [
   { label: "Workflows", icon: Workflow, to: "/workflows" },
 ];
 
-
 function NavItem({ item }: { item: Item }) {
   const Icon = item.icon;
   const cls = cn(
@@ -63,7 +67,11 @@ function NavItem({ item }: { item: Item }) {
   );
   if (item.to) {
     return (
-      <Link to={item.to} className={cls} activeProps={{ className: "bg-surface-2 text-foreground" }}>
+      <Link
+        to={item.to}
+        className={cls}
+        activeProps={{ className: "bg-surface-2 text-foreground" }}
+      >
         {inner}
       </Link>
     );
@@ -72,7 +80,9 @@ function NavItem({ item }: { item: Item }) {
     <button
       type="button"
       className={cls}
-      onClick={() => toast(`${item.label} is coming soon`, { description: "This studio is still in the works." })}
+      onClick={() =>
+        toast(`${item.label} is coming soon`, { description: "This studio is still in the works." })
+      }
     >
       {inner}
     </button>

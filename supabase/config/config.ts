@@ -1,3 +1,7 @@
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+import { brokeredPreviewStorage } from "@/integrations/supabase/previewAuthStorage";
+
 /**
  * Single source of truth for this project's PUBLIC Supabase connection.
  *
@@ -18,10 +22,12 @@ export const SUPABASE_PUBLISHABLE_KEY = SUPABASE_ANON_KEY;
 
 export const SUPABASE_REF_ID = "uqyuwxztevkokzqldibh";
 
-/**
- * The external "Video Engine" render repository is reached ONLY by the
- * `video-agent` Supabase Edge Function, which holds the `GITHUB_PAT` secret.
- * No GitHub identifier, endpoint or token belongs in app code.
- */
-
 export type { Database } from "@/integrations/supabase/types";
+
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storage: brokeredPreviewStorage(),
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});

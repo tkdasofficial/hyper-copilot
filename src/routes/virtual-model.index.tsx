@@ -46,9 +46,7 @@ export const Route = createFileRoute("/virtual-model/")({
         "face consistent AI images",
         "AI model photoshoot",
       ],
-      breadcrumbs: [
-        { name: "Virtual Model", path: "/virtual-model" },
-      ],
+      breadcrumbs: [{ name: "Virtual Model", path: "/virtual-model" }],
     }),
   component: VirtualModelStudio,
 });
@@ -57,8 +55,25 @@ const ratios = ["1:1", "4:5", "3:2", "16:9", "9:16", "2:3", "3:4"] as const;
 const resolutions = ["1K", "2K", "4K", "8K"] as const;
 const outfits = ["Streetwear", "Couture", "Denim", "Business", "Athleisure", "Gown", "Traditional"];
 const accessories = ["Sunglasses", "Earrings", "Necklace", "Watch", "Cap", "Handbag"];
-const backgrounds = ["Studio", "City", "Café", "Beach", "Rooftop", "Interior", "Nature", "Neon"] as const;
-const lighting = ["Softbox", "Golden hour", "Rembrandt", "Ring", "Neon", "Flash", "Backlit"] as const;
+const backgrounds = [
+  "Studio",
+  "City",
+  "Café",
+  "Beach",
+  "Rooftop",
+  "Interior",
+  "Nature",
+  "Neon",
+] as const;
+const lighting = [
+  "Softbox",
+  "Golden hour",
+  "Rembrandt",
+  "Ring",
+  "Neon",
+  "Flash",
+  "Backlit",
+] as const;
 const shots = ["Portrait", "Half body", "Full body", "Close-up", "Wide"] as const;
 const lenses = ["24mm", "35mm", "50mm", "85mm", "135mm"] as const;
 
@@ -70,7 +85,9 @@ function VirtualModelStudio() {
     queryFn: () => listVirtualModels(),
     // While a profile is still being built, keep the processing card fresh.
     refetchInterval: (q) =>
-      (q.state.data ?? []).some((m) => m.status !== "ready" && m.status !== "failed") ? 5000 : false,
+      (q.state.data ?? []).some((m) => m.status !== "ready" && m.status !== "failed")
+        ? 5000
+        : false,
   });
   const models: VirtualModel[] = (saved ?? [])
     .filter((m) => m.status !== "failed")
@@ -119,7 +136,6 @@ function VirtualModelStudio() {
   // Wardrobe, scene, camera and output settings are sent as structured fields
   // and turned into prompt clauses server-side, so each control has real effect.
   const scenePrompt = () => prompt.trim();
-
 
   const render = useMutation({
     mutationFn: async () => {
@@ -216,7 +232,12 @@ function VirtualModelStudio() {
 
         <Panel title="Output" summary={`${count} variations · ${consistency}% consistency`}>
           <SliderRow label="Micro detail" value={detail} onChange={setDetail} suffix="%" />
-          <SliderRow label="Identity consistency" value={consistency} onChange={setConsistency} suffix="%" />
+          <SliderRow
+            label="Identity consistency"
+            value={consistency}
+            onChange={setConsistency}
+            suffix="%"
+          />
           <SliderRow label="Variations" value={count} onChange={setCount} min={1} max={8} />
           <SwitchRow label="Face lock" checked={faceLock} onCheckedChange={setFaceLock} />
           <SwitchRow label="Auto upscale" checked={upscale} onCheckedChange={setUpscale} />
@@ -258,8 +279,8 @@ function VirtualModelStudio() {
             <AlertDialogTitle>Delete “{pendingDelete?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently removes the model and all its generated images. Type{" "}
-              <span className="font-semibold text-foreground">{pendingDelete?.name}</span>{" "}
-              exactly to confirm.
+              <span className="font-semibold text-foreground">{pendingDelete?.name}</span> exactly
+              to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Input

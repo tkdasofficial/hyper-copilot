@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Done
+
 - Synchronize the existing Meta Login configuration with the account-linking flow
 - Restore rounded workflow controls and keep Customize Creation always accessible
 - Repair manual video workflow execution and progress feedback

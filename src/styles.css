@@ -85,11 +85,7 @@
   --input: oklch(0.14 0 0 / 16%);
   --ring: oklch(0.5 0.24 264);
 
-  --gradient-spectral: linear-gradient(
-    100deg,
-    var(--spectral-1) 0%,
-    var(--spectral-3) 100%
-  );
+  --gradient-spectral: linear-gradient(100deg, var(--spectral-1) 0%, var(--spectral-3) 100%);
   --gradient-aura: radial-gradient(
     120% 100% at 50% 0%,
     color-mix(in oklab, var(--spectral-3) 20%, transparent) 0%,
@@ -102,8 +98,9 @@
     color-mix(in oklab, oklch(1 0 0) 30%, transparent)
   );
   --shadow-float: 0 24px 60px -24px oklch(0 0 0 / 0.22);
-  --shadow-glow: 0 0 0 1px var(--border-strong), 0 30px 80px -32px
-    color-mix(in oklab, var(--spectral-3) 30%, transparent);
+  --shadow-glow:
+    0 0 0 1px var(--border-strong),
+    0 30px 80px -32px color-mix(in oklab, var(--spectral-3) 30%, transparent);
 }
 
 /* ---------- Dark theme ---------- */
@@ -144,8 +141,9 @@
     color-mix(in oklab, oklch(1 0 0) 2%, transparent)
   );
   --shadow-float: 0 24px 60px -24px oklch(0 0 0 / 0.75);
-  --shadow-glow: 0 0 0 1px var(--border-strong), 0 30px 80px -32px
-    color-mix(in oklab, var(--spectral-3) 55%, transparent);
+  --shadow-glow:
+    0 0 0 1px var(--border-strong),
+    0 30px 80px -32px color-mix(in oklab, var(--spectral-3) 55%, transparent);
 }
 
 @layer base {
@@ -188,7 +186,6 @@
     display: none;
   }
 }
-
 
 @utility text-spectral {
   background: var(--gradient-spectral);

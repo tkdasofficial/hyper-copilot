@@ -1,0 +1,6 @@
+{
+  "name": "Hyper Copilot",
+  "description": "Hyper Copilot is an all-in-one multi-modal AI platform for image, video, audio, and AI influencer creation, inspired by Adobe Firefly.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

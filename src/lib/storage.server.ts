@@ -42,11 +42,7 @@ export async function uploadBytes(
 }
 
 /** Downloads a provider result URL and stores it in the given bucket. */
-export async function uploadFromUrl(
-  bucket: string,
-  userId: string,
-  url: string,
-): Promise<string> {
+export async function uploadFromUrl(bucket: string, userId: string, url: string): Promise<string> {
   if (url.startsWith("data:")) {
     const { bytes, contentType } = dataUrlToBytes(url);
     return uploadBytes(bucket, userId, bytes, contentType);
@@ -98,10 +94,7 @@ export async function signedUrl(bucket: string, path: string): Promise<string | 
   return data?.signedUrl ?? null;
 }
 
-export async function signedUrls(
-  bucket: string,
-  paths: string[],
-): Promise<Record<string, string>> {
+export async function signedUrls(bucket: string, paths: string[]): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   await Promise.all(
     paths.map(async (p) => {

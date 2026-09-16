@@ -15,11 +15,7 @@ export const Route = createFileRoute("/settings")({
       description:
         "Manage your Hyper Copilot account preferences and choose a System, Light or Dark appearance for the generative AI studio.",
       noindex: true,
-      keywords: [
-        "Hyper Copilot settings",
-        "AI studio dark mode",
-        "account preferences",
-      ],
+      keywords: ["Hyper Copilot settings", "AI studio dark mode", "account preferences"],
     }),
   component: SettingsPage,
 });
@@ -46,12 +42,16 @@ function SettingsPage() {
       <div className="lg:pl-[248px]">
         <TopBar />
         <main className="mx-auto max-w-3xl px-4 pb-28 pt-6 lg:px-8 lg:pb-20">
-          <section aria-labelledby="appearance" className="rounded-3xl border border-border bg-surface/60 p-5">
+          <section
+            aria-labelledby="appearance"
+            className="rounded-3xl border border-border bg-surface/60 p-5"
+          >
             <h2 id="appearance" className="text-[15px] font-bold">
               Appearance
             </h2>
             <p className="mt-1 text-[12.5px] text-muted-foreground">
-              Currently rendering in <span className="font-semibold text-foreground">{resolved}</span> mode.
+              Currently rendering in{" "}
+              <span className="font-semibold text-foreground">{resolved}</span> mode.
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -80,7 +80,10 @@ function SettingsPage() {
             </div>
           </section>
 
-          <section aria-labelledby="account" className="mt-4 rounded-3xl border border-border bg-surface/60 p-5">
+          <section
+            aria-labelledby="account"
+            className="mt-4 rounded-3xl border border-border bg-surface/60 p-5"
+          >
             <h2 id="account" className="text-[15px] font-bold">
               Account
             </h2>
@@ -102,7 +105,9 @@ function SettingsPage() {
               <div className="flex items-center justify-between py-2.5">
                 <dt className="text-muted-foreground">Credits left</dt>
                 <dd className="font-semibold">
-                  {account ? `${account.credits.toLocaleString()} of ${account.quota.toLocaleString()}` : "—"}
+                  {account
+                    ? `${account.credits.toLocaleString()} of ${account.quota.toLocaleString()}`
+                    : "—"}
                 </dd>
               </div>
               {account?.periodEnd ? (

@@ -17,9 +17,7 @@ export const Route = createFileRoute("/privacy")({
         "GDPR AI platform",
         "AI model training opt out",
       ],
-      breadcrumbs: [
-        { name: "Privacy Policy", path: "/privacy" },
-      ],
+      breadcrumbs: [{ name: "Privacy Policy", path: "/privacy" }],
     }),
   component: PrivacyPage,
 });

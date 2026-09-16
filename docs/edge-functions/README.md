@@ -11,18 +11,18 @@ The editor blocks writes under `supabase/functions/` for this TanStack stack, so
 mirrored copies live here instead. The layout, file names and contents are identical to
 what a `supabase/functions/` tree would contain.
 
-| Function | Purpose |
-| --- | --- |
-| `generate-audio` | Narration / audio generation |
-| `generate-image` | Image generation |
-| `generate-video` | Video generation |
-| `handle-job-execution` | Job queue execution |
-| `process-scheduled-cron` | Scheduled pass driven by the database clock |
-| `publish-to-meta` | Facebook / Instagram / Threads publishing |
-| `update-record-handler` | Record update webhook handler |
-| `video-agent` | Dispatches renders to the render engine (holds `GITHUB_PAT`) |
-| `youtube-publish` | YouTube OAuth exchange, upload, metadata update |
-| `sync-meta-secrets` | Copies Meta credentials into the encrypted provider store |
+| Function                 | Purpose                                                      |
+| ------------------------ | ------------------------------------------------------------ |
+| `generate-audio`         | Narration / audio generation                                 |
+| `generate-image`         | Image generation                                             |
+| `generate-video`         | Video generation                                             |
+| `handle-job-execution`   | Job queue execution                                          |
+| `process-scheduled-cron` | Scheduled pass driven by the database clock                  |
+| `publish-to-meta`        | Facebook / Instagram / Threads publishing                    |
+| `update-record-handler`  | Record update webhook handler                                |
+| `video-agent`            | Dispatches renders to the render engine (holds `GITHUB_PAT`) |
+| `youtube-publish`        | YouTube OAuth exchange, upload, metadata update              |
+| `sync-meta-secrets`      | Copies Meta credentials into the encrypted provider store    |
 
 ## Call model — backend only
 

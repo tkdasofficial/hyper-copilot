@@ -9,9 +9,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 async function handle(request: Request) {
-  const { authorizePipelineRequest, json, readJsonBody } = await import(
-    "@/lib/pipeline-auth.server"
-  );
+  const { authorizePipelineRequest, json, readJsonBody } =
+    await import("@/lib/pipeline-auth.server");
   if (!(await authorizePipelineRequest(request))) return json({ error: "Unauthorized" }, 401);
 
   const body = await readJsonBody(request);

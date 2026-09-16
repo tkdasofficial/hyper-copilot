@@ -15,8 +15,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const UPLOAD_URL =
   "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status";
-const CHANNELS_URL =
-  "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true";
+const CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true";
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -122,14 +121,14 @@ async function upload(input: UploadInput) {
   const bytes = new Uint8Array(await media.arrayBuffer());
 
   const rawTitle = (input.title ?? "").trim() || "New video";
-  const title = (input.isShort && !/#shorts/i.test(rawTitle)
-    ? `${rawTitle} #Shorts`
-    : rawTitle
+  const title = (
+    input.isShort && !/#shorts/i.test(rawTitle) ? `${rawTitle} #Shorts` : rawTitle
   ).slice(0, 100);
 
-  const scheduled = input.publishAt && new Date(input.publishAt).getTime() > Date.now()
-    ? new Date(input.publishAt).toISOString()
-    : null;
+  const scheduled =
+    input.publishAt && new Date(input.publishAt).getTime() > Date.now()
+      ? new Date(input.publishAt).toISOString()
+      : null;
 
   const metadata = {
     snippet: {
@@ -139,7 +138,7 @@ async function upload(input: UploadInput) {
       categoryId: input.categoryId || "20",
     },
     status: {
-      privacyStatus: scheduled ? "private" : (input.privacyStatus || "public"),
+      privacyStatus: scheduled ? "private" : input.privacyStatus || "public",
       selfDeclaredMadeForKids: input.madeForKids === true,
       ...(scheduled ? { publishAt: scheduled } : {}),
     },

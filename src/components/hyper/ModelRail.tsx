@@ -81,7 +81,9 @@ export function ModelRail({
               <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-muted/40 px-2 text-center">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.6} />
                 <span className="text-[10px] font-bold text-muted-foreground">Processing…</span>
-                <span className="w-full truncate text-[10px] text-muted-foreground/80">{m.name}</span>
+                <span className="w-full truncate text-[10px] text-muted-foreground/80">
+                  {m.name}
+                </span>
               </div>
             ) : m.headshotUrl ? (
               <img
@@ -109,7 +111,6 @@ export function ModelRail({
           </button>
         );
       })}
-
 
       <button
         type="button"

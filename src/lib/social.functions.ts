@@ -58,7 +58,6 @@ export const getMetaConfig = createServerFn({ method: "GET" }).handler(async () 
   }
 });
 
-
 /** Every social account the signed-in user has linked. */
 export const listSocialConnections = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -91,11 +90,21 @@ function friendlyMetaError(status: number, body: string): string {
   return `Meta could not complete the request [${status}]: ${message}`;
 }
 
-async function graphJson(url: string): Promise<any> {
+type GraphResponse = Record<string, unknown> & {
+  data?: unknown[];
+  access_token?: string;
+  id?: string;
+  name?: string;
+  picture?: { data?: { url?: string } };
+  paging?: { cursors?: { after?: string } };
+  granular_scopes?: Array<{ scope?: string; target_ids?: unknown[] }>;
+};
+
+async function graphJson(url: string): Promise<GraphResponse> {
   const res = await fetch(url);
   const body = await res.text();
   if (!res.ok) throw new Error(friendlyMetaError(res.status, body));
-  return body ? JSON.parse(body) : {};
+  return (body ? JSON.parse(body) : {}) as GraphResponse;
 }
 
 async function exchangeFacebookCode(
@@ -156,7 +165,6 @@ async function exchangeThreadsCode(
   }
 }
 
-
 type Discovered = {
   externalId: string;
   displayName: string | null;
@@ -170,13 +178,28 @@ const PAGE_FIELDS = "id,name,access_token,picture{url}";
 const INSTAGRAM_FIELDS =
   "instagram_business_account{id,username,profile_picture_url},connected_instagram_account{id,username,profile_picture_url}";
 
-/** Collects Pages from the user edge, then from any businesses they administer. */
-async function collectPages(userToken: string, includeInstagram: boolean): Promise<any[]> {
-  const token = encodeURIComponent(userToken);
-  const found = new Map<string, any>();
+type MetaPageRecord = Record<string, unknown> & {
+  id?: string | number;
+  name?: string;
+  access_token?: string;
+  picture?: { data?: { url?: string } };
+  instagram_business_account?: { id?: string; username?: string; profile_picture_url?: string };
+  connected_instagram_account?: { id?: string; username?: string; profile_picture_url?: string };
+};
 
-  const absorb = (list: any[] | undefined) => {
-    for (const page of list ?? []) if (page?.id) found.set(String(page.id), page);
+/** Collects Pages from the user edge, then from any businesses they administer. */
+async function collectPages(
+  userToken: string,
+  includeInstagram: boolean,
+): Promise<MetaPageRecord[]> {
+  const token = encodeURIComponent(userToken);
+  const found = new Map<string, MetaPageRecord>();
+
+  const absorb = (list: unknown[] | undefined) => {
+    for (const page of list ?? []) {
+      const p = page as MetaPageRecord;
+      if (p?.id) found.set(String(p.id), p);
+    }
   };
 
   const pages = await graphJson(
@@ -189,7 +212,7 @@ async function collectPages(userToken: string, includeInstagram: boolean): Promi
       const businesses = await graphJson(
         `${GRAPH}/me/businesses?fields=${encodeURIComponent(`owned_pages{${PAGE_FIELDS}},client_pages{${PAGE_FIELDS}}`)}&limit=50&access_token=${token}`,
       );
-      for (const biz of businesses.data ?? []) {
+      for (const biz of (businesses.data as Array<Record<string, { data?: unknown[] }>>) ?? []) {
         absorb(biz?.owned_pages?.data);
         absorb(biz?.client_pages?.data);
       }
@@ -250,7 +273,10 @@ async function discoverAccounts(
   }
 
   return list
-    .map((page) => ({ page, ig: page.instagram_business_account ?? page.connected_instagram_account }))
+    .map((page) => ({
+      page,
+      ig: page.instagram_business_account ?? page.connected_instagram_account,
+    }))
     .filter((entry) => entry.ig?.id)
     .map(({ page, ig }) => ({
       externalId: String(ig.id),
@@ -262,7 +288,6 @@ async function discoverAccounts(
     }));
 }
 
-
 /** Explains why Meta returned no accounts, using the permissions it actually granted. */
 async function explainEmptyDiscovery(
   provider: SocialProvider,
@@ -270,11 +295,11 @@ async function explainEmptyDiscovery(
   credentials: MetaCredentials,
 ): Promise<string> {
   const token = encodeURIComponent(userToken);
-  let granted: string[] = [];
-  let declined: string[] = [];
+  const granted: string[] = [];
+  const declined: string[] = [];
   try {
     const perms = await graphJson(`${GRAPH}/me/permissions?access_token=${token}`);
-    for (const row of perms.data ?? []) {
+    for (const row of (perms.data as Array<{ status?: string; permission?: string }>) ?? []) {
       if (row?.status === "granted") granted.push(String(row.permission));
       else declined.push(String(row.permission));
     }
@@ -282,7 +307,8 @@ async function explainEmptyDiscovery(
     /* permissions edge unavailable */
   }
 
-  const needed = provider === "instagram" ? ["pages_show_list", "instagram_basic"] : ["pages_show_list"];
+  const needed =
+    provider === "instagram" ? ["pages_show_list", "instagram_basic"] : ["pages_show_list"];
   const missing = needed.filter((scope) => !granted.includes(scope));
   if (missing.length > 0) {
     return `Meta did not grant ${missing.join(" and ")}${
@@ -295,10 +321,10 @@ async function explainEmptyDiscovery(
     const debug = await graphJson(
       `${GRAPH}/debug_token?input_token=${token}&access_token=${encodeURIComponent(appToken)}`,
     );
-    const granular = Array.isArray(debug?.data?.granular_scopes)
-      ? debug.data.granular_scopes
-      : [];
-    const pageGrant = granular.find((scope: any) => scope?.scope === "pages_show_list");
+    const granular = Array.isArray(debug?.data?.granular_scopes) ? debug.data.granular_scopes : [];
+    const pageGrant = granular.find(
+      (scope: { scope?: string }) => scope?.scope === "pages_show_list",
+    ) as { scope?: string; target_ids?: unknown[] } | undefined;
     if (pageGrant && (!Array.isArray(pageGrant.target_ids) || pageGrant.target_ids.length === 0)) {
       return "Meta granted Page permission but shared no Page with Hyper Copilot. Connect again and select at least one Page in Meta's Page picker.";
     }
@@ -311,7 +337,6 @@ async function explainEmptyDiscovery(
   }
   return "Permissions were granted, but Meta returned no Page. This happens when the Facebook account manages no Page, or the app is in development mode and your account is not added as a tester/admin with a Page. Create or get admin access to a Page, add your account under App roles, then connect again.";
 }
-
 
 /**
  * Completes the Meta OAuth round-trip: exchanges the one-time code for a
@@ -348,10 +373,7 @@ export const completeMetaConnection = createServerFn({ method: "POST" })
       };
     }
 
-
-
-    const expiresAt =
-      expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null;
+    const expiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null;
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const rows = accounts.map((acct) => ({
@@ -382,10 +404,7 @@ export const disconnectSocialAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("social_connections")
-      .delete()
-      .eq("id", data.id);
+    const { error } = await context.supabase.from("social_connections").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

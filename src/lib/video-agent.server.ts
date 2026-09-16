@@ -15,7 +15,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { SUPABASE_URL } from "../../supabase/config/config";
+import { SUPABASE_URL } from "@/config";
 import type { Database } from "@/integrations/supabase/types";
 
 /** Supabase Edge Function that owns the Video Engine credential. */
@@ -82,7 +82,8 @@ async function invokeRenderDispatch(
   } catch (err) {
     return {
       ok: false,
-      error: `Could not reach the render service. ${err instanceof Error ? err.message : ""}`.trim(),
+      error:
+        `Could not reach the render service. ${err instanceof Error ? err.message : ""}`.trim(),
     };
   }
 }
@@ -132,7 +133,10 @@ export type DispatchOutcome = "dispatched" | "skipped" | "failed";
  * render. Safe to call repeatedly — the claim is atomic, so a row is only ever
  * dispatched once even when the trigger and the tick race.
  */
-export async function dispatchVideoRender(admin: Client, videoId: string): Promise<DispatchOutcome> {
+export async function dispatchVideoRender(
+  admin: Client,
+  videoId: string,
+): Promise<DispatchOutcome> {
   const { data: claimed } = await admin
     .from("videos")
     .update({ step: RENDER_STEP_DISPATCHING })
@@ -164,7 +168,10 @@ export async function dispatchVideoRender(admin: Client, videoId: string): Promi
     credits.videoCredits > 0
       ? { video_credits: credits.videoCredits - 1 }
       : { credits_used: credits.creditsUsed + 1 };
-  const { error: spendError } = await admin.from("subscriptions").update(spend).eq("user_id", userId);
+  const { error: spendError } = await admin
+    .from("subscriptions")
+    .update(spend)
+    .eq("user_id", userId);
   if (spendError) return fail("Could not reserve a render credit. Please try again.");
 
   const refund = async () => {
@@ -206,7 +213,10 @@ export async function dispatchPendingRenders(
   const outcomes: { id: string; outcome: DispatchOutcome }[] = [];
 
   if (options.videoId) {
-    outcomes.push({ id: options.videoId, outcome: await dispatchVideoRender(admin, options.videoId) });
+    outcomes.push({
+      id: options.videoId,
+      outcome: await dispatchVideoRender(admin, options.videoId),
+    });
     return outcomes;
   }
 

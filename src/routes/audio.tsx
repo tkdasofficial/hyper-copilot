@@ -4,7 +4,14 @@ import { pageHead } from "@/lib/seo";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { StudioLayout } from "@/components/hyper/StudioLayout";
-import { Chips, Panel, Segment, SliderRow, SwitchRow, TextRow } from "@/components/hyper/StudioControls";
+import {
+  Chips,
+  Panel,
+  Segment,
+  SliderRow,
+  SwitchRow,
+  TextRow,
+} from "@/components/hyper/StudioControls";
 import { RecentCreations } from "@/components/hyper/RecentCreations";
 import { runJob } from "@/lib/jobs-runner";
 import { SPEECH_TONES, TTS_MODELS, VOICES } from "@/lib/media.shared";
@@ -27,15 +34,22 @@ export const Route = createFileRoute("/audio")({
         "AI narration generator",
         "AI song maker",
       ],
-      breadcrumbs: [
-        { name: "Audio Studio", path: "/audio" },
-      ],
+      breadcrumbs: [{ name: "Audio Studio", path: "/audio" }],
     }),
   component: AudioStudio,
 });
 
 const modes = ["Text to speech", "Text to music"] as const;
-const genres = ["Cinematic", "Electronic", "Lo-Fi", "Orchestral", "Hip-Hop", "Ambient", "Rock", "Jazz"] as const;
+const genres = [
+  "Cinematic",
+  "Electronic",
+  "Lo-Fi",
+  "Orchestral",
+  "Hip-Hop",
+  "Ambient",
+  "Rock",
+  "Jazz",
+] as const;
 const moods = ["Epic", "Calm", "Dark", "Uplifting", "Melancholic", "Tense"] as const;
 const musicDurations = ["15s", "30s", "60s", "120s"] as const;
 const voiceIds = VOICES.map((v) => v.id) as unknown as readonly string[];
@@ -133,14 +147,25 @@ function AudioStudio() {
               <p className="text-[11.5px] text-muted-foreground">{ttsModel.note}</p>
             </Panel>
 
-            <Panel title="Voice" summary={`${voice}${voiceNote ? ` · ${voiceNote}` : ""}`} defaultOpen>
+            <Panel
+              title="Voice"
+              summary={`${voice}${voiceNote ? ` · ${voiceNote}` : ""}`}
+              defaultOpen
+            >
               <Segment options={voiceIds} value={voice} onChange={setVoice} />
               <p className="text-[11.5px] text-muted-foreground">{voiceNote}</p>
             </Panel>
 
             <Panel title="Delivery" summary={`${tone} · ${pace}% pace`}>
               <Chips label="Tone" options={SPEECH_TONES} values={[tone]} onToggle={setTone} />
-              <SliderRow label="Pace" value={pace} onChange={setPace} min={70} max={130} suffix="%" />
+              <SliderRow
+                label="Pace"
+                value={pace}
+                onChange={setPace}
+                min={70}
+                max={130}
+                suffix="%"
+              />
             </Panel>
           </>
         ) : (
@@ -156,7 +181,14 @@ function AudioStudio() {
             </Panel>
 
             <Panel title="Composition" summary={`${tempo} BPM · ${musicDuration}`} defaultOpen>
-              <SliderRow label="Tempo" value={tempo} onChange={setTempo} min={40} max={220} suffix=" BPM" />
+              <SliderRow
+                label="Tempo"
+                value={tempo}
+                onChange={setTempo}
+                min={40}
+                max={220}
+                suffix=" BPM"
+              />
               <Segment
                 label="Duration"
                 options={musicDurations}
@@ -183,7 +215,11 @@ function AudioStudio() {
         </button>
 
         {trackUrl ? (
-          <audio src={trackUrl} controls className="w-full rounded-full border border-border bg-surface" />
+          <audio
+            src={trackUrl}
+            controls
+            className="w-full rounded-full border border-border bg-surface"
+          />
         ) : null}
 
         <RecentCreations />

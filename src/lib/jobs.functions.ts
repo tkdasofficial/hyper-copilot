@@ -45,9 +45,7 @@ export const listJobs = createServerFn({ method: "POST" })
         .from("generations")
         .select("id, storage_path")
         .in("id", genIds);
-      const paths = (gens ?? [])
-        .map((g) => g.storage_path)
-        .filter((p): p is string => !!p);
+      const paths = (gens ?? []).map((g) => g.storage_path).filter((p): p is string => !!p);
       const signed = await storage.signedUrls(storage.GENERATIONS_BUCKET, paths);
       for (const g of gens ?? []) {
         urlById.set(g.id, g.storage_path ? (signed[g.storage_path] ?? null) : null);

@@ -33,13 +33,36 @@ export const Route = createFileRoute("/virtual-model/create-model")({
 
 const genders = ["Female", "Male", "Androgynous"] as const;
 const bodyTypes = ["Slim", "Athletic", "Curvy", "Plus", "Muscular"] as const;
-const styleModes = ["Realistic", "Cinematic", "Editorial", "Cartoon", "Anime", "3D", "HEAVEN"] as const;
+const styleModes = [
+  "Realistic",
+  "Cinematic",
+  "Editorial",
+  "Cartoon",
+  "Anime",
+  "3D",
+  "HEAVEN",
+] as const;
 const eyeColors = ["Brown", "Hazel", "Amber", "Green", "Blue", "Grey"] as const;
 const hairStyles = ["Long", "Wavy", "Curly", "Bob", "Pixie", "Braids", "Ponytail", "Buzz"] as const;
 const hairColors = ["Black", "Brown", "Blonde", "Auburn", "Red", "Platinum", "Blue"] as const;
 const skinTones = ["I", "II", "III", "IV", "V", "VI"] as const;
-const ethnicities = ["Global", "East Asian", "South Asian", "African", "Latina", "Middle Eastern", "European"] as const;
-const faceTraits = ["Freckles", "Dimples", "Sharp jawline", "Soft cheeks", "Beauty mark", "Full lips"];
+const ethnicities = [
+  "Global",
+  "East Asian",
+  "South Asian",
+  "African",
+  "Latina",
+  "Middle Eastern",
+  "European",
+] as const;
+const faceTraits = [
+  "Freckles",
+  "Dimples",
+  "Sharp jawline",
+  "Soft cheeks",
+  "Beauty mark",
+  "Full lips",
+];
 
 function CreateModel() {
   const navigate = useNavigate();
@@ -97,18 +120,30 @@ function CreateModel() {
       toast.error(err instanceof Error ? err.message : "Could not create the model"),
   });
 
-
   return (
     <StudioLayout>
       <div className="space-y-3.5">
         <div className="rounded-2xl border border-border bg-surface/50 p-3.5">
-          <TextRow label="Model name" value={name} onChange={setName} rows={1} placeholder="e.g. Aya Nakamura" />
+          <TextRow
+            label="Model name"
+            value={name}
+            onChange={setName}
+            rows={1}
+            placeholder="e.g. Aya Nakamura"
+          />
         </div>
 
         <Panel title="Identity" summary={`${gender} · ${age} · ${height}cm · ${body}`} defaultOpen>
           <Segment label="Presentation" options={genders} value={gender} onChange={setGender} />
           <SliderRow label="Age" value={age} onChange={setAge} min={18} max={70} />
-          <SliderRow label="Height" value={height} onChange={setHeight} min={145} max={205} suffix=" cm" />
+          <SliderRow
+            label="Height"
+            value={height}
+            onChange={setHeight}
+            min={145}
+            max={205}
+            suffix=" cm"
+          />
           <Segment label="Body type" options={bodyTypes} value={body} onChange={setBody} />
         </Panel>
 
@@ -117,12 +152,22 @@ function CreateModel() {
         </Panel>
 
         <Panel title="Face & skin" summary={`${ethnicity} · ${skin} · ${eye} eyes`}>
-          <Segment label="Ethnic features" options={ethnicities} value={ethnicity} onChange={setEthnicity} />
+          <Segment
+            label="Ethnic features"
+            options={ethnicities}
+            value={ethnicity}
+            onChange={setEthnicity}
+          />
           <Segment label="Skin tone" options={skinTones} value={skin} onChange={setSkin} />
           <Segment label="Eye color" options={eyeColors} value={eye} onChange={setEye} />
-          <Chips label="Face traits" options={faceTraits} values={traits} onToggle={(v) =>
-            setTraits((l) => (l.includes(v) ? l.filter((x) => x !== v) : [...l, v]))
-          } />
+          <Chips
+            label="Face traits"
+            options={faceTraits}
+            values={traits}
+            onToggle={(v) =>
+              setTraits((l) => (l.includes(v) ? l.filter((x) => x !== v) : [...l, v]))
+            }
+          />
         </Panel>
 
         <Panel title="Hair" summary={`${hair} · ${hairColor}`}>
@@ -154,8 +199,6 @@ function CreateModel() {
             later render. Lower values allow more variation between shots.
           </p>
         </Panel>
-
-
 
         <button
           type="button"

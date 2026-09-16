@@ -16,9 +16,7 @@ export const Route = createFileRoute("/terms")({
         "AI commercial use license",
         "AI acceptable use policy",
       ],
-      breadcrumbs: [
-        { name: "Terms of Service", path: "/terms" },
-      ],
+      breadcrumbs: [{ name: "Terms of Service", path: "/terms" }],
     }),
   component: TermsPage,
 });

@@ -2,10 +2,10 @@
 
 Decoupled AI video generation across three systems:
 
-| System | Owns |
-| --- | --- |
-| Lovable app (this repo) | UI, auth, credits, job row creation, dispatch, realtime display |
-| Supabase (`uqyuwxztevkokzqldibh`) | Auth, `profiles`, `subscriptions`, `videos`, private `videos` storage bucket, Realtime |
+| System                               | Owns                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Lovable app (this repo)              | UI, auth, credits, job row creation, dispatch, realtime display                            |
+| Supabase (`uqyuwxztevkokzqldibh`)    | Auth, `profiles`, `subscriptions`, `videos`, private `videos` storage bucket, Realtime     |
 | `tkdasofficial/video-agent` (GitHub) | All heavy AI work: Pixazo images, Cloudflare AI script + voice, FFmpeg composition, upload |
 
 ```text
@@ -37,8 +37,8 @@ Code: `src/routes/video-agent.tsx` (form + submit), `src/lib/video-agent.functio
    every user parameter; its `id` is the `video_id` for the whole pipeline.
 4. A `repository_dispatch` (`event_type: video_agent_render`) is POSTed to
    `https://api.github.com/repos/tkdasofficial/video-agent/dispatches` with
-  `client_payload: { video_id, user_id, prompt, negative_prompt, voice_gender, image_style, aspect_ratio, duration_seconds, captions }`.
-  The dispatch sends nine properties, below GitHub's limit of ten `client_payload` properties. Additional preferences remain stored on the `videos` row and use renderer defaults.
+   `client_payload: { video_id, user_id, prompt, negative_prompt, voice_gender, image_style, aspect_ratio, duration_seconds, captions }`.
+   The dispatch sends nine properties, below GitHub's limit of ten `client_payload` properties. Additional preferences remain stored on the `videos` row and use renderer defaults.
    Dispatch failure marks the row `failed` and refunds the reserved credit.
 
 The GitHub token lives in the server-side secret `GITHUB_PAT` (never in
@@ -49,11 +49,11 @@ Repository owner/name/event constants do live in that config file.
 
 Reference files to copy into `tkdasofficial/video-agent`:
 
-| From this repo | To engine repo |
-| --- | --- |
-| [`docs/video-agent/video-agent.yml`](./video-agent/video-agent.yml) | `.github/workflows/video-agent.yml` |
-| [`docs/video-agent/requirements.txt`](./video-agent/requirements.txt) | `requirements.txt` (repo root) |
-| [`docs/video-agent/render.py`](./video-agent/render.py) | `render.py` (repo root) |
+| From this repo                                                        | To engine repo                      |
+| --------------------------------------------------------------------- | ----------------------------------- |
+| [`docs/video-agent/video-agent.yml`](./video-agent/video-agent.yml)   | `.github/workflows/video-agent.yml` |
+| [`docs/video-agent/requirements.txt`](./video-agent/requirements.txt) | `requirements.txt` (repo root)      |
+| [`docs/video-agent/render.py`](./video-agent/render.py)               | `render.py` (repo root)             |
 
 Missing `requirements.txt` or `render.py` in the engine repo is what causes
 `Could not open requirements file` / exit code 1 in the runner — the workflow now falls back to

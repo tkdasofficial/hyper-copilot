@@ -52,7 +52,9 @@ export function pageHead(input: HeadInput) {
     { name: "author", content: AUTHOR },
     {
       name: "robots",
-      content: input.noindex ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1",
+      content: input.noindex
+        ? "noindex, nofollow"
+        : "index, follow, max-image-preview:large, max-snippet:-1",
     },
     { property: "og:site_name", content: SITE_NAME },
     { property: "og:locale", content: "en_US" },

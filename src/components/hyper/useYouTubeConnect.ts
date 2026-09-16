@@ -20,10 +20,9 @@ function readResult(): OAuthResult | null {
 
 function waitForCode(popup: Window, state: string) {
   return new Promise<string>((resolve, reject) => {
-    let poll: number | undefined;
     const cleanup = () => {
       window.removeEventListener("message", onMessage);
-      if (poll !== undefined) window.clearInterval(poll);
+      window.clearInterval(poll);
     };
     const settle = (result: OAuthResult) => {
       cleanup();
@@ -37,7 +36,7 @@ function waitForCode(popup: Window, state: string) {
       settle(event.data as OAuthResult);
     };
     window.addEventListener("message", onMessage);
-    poll = window.setInterval(() => {
+    const poll = window.setInterval(() => {
       const stored = readResult();
       if (stored && stored.state === state) {
         try {

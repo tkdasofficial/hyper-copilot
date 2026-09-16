@@ -23,42 +23,40 @@ export const Route = createFileRoute("/pricing")({
         "commercial license AI images",
         "AI credits pricing",
       ],
-      breadcrumbs: [
-        { name: "Pricing", path: "/pricing" },
-      ],
+      breadcrumbs: [{ name: "Pricing", path: "/pricing" }],
       jsonLd: [
         {
           "@type": "Product",
-          "name": "Hyper Copilot",
-          "description": "Multi-modal AI generation platform",
-          "brand": {
+          name: "Hyper Copilot",
+          description: "Multi-modal AI generation platform",
+          brand: {
             "@type": "Brand",
-            "name": "Hyper Copilot"
+            name: "Hyper Copilot",
           },
-          "offers": [
+          offers: [
             {
               "@type": "Offer",
-              "name": "Starter",
-              "price": "0",
-              "priceCurrency": "USD",
-              "url": "https://hypercopilot.vercel.app/pricing"
+              name: "Starter",
+              price: "0",
+              priceCurrency: "USD",
+              url: "https://hypercopilot.vercel.app/pricing",
             },
             {
               "@type": "Offer",
-              "name": "Pro",
-              "price": "29",
-              "priceCurrency": "USD",
-              "url": "https://hypercopilot.vercel.app/pricing"
+              name: "Pro",
+              price: "29",
+              priceCurrency: "USD",
+              url: "https://hypercopilot.vercel.app/pricing",
             },
             {
               "@type": "Offer",
-              "name": "Studio",
-              "price": "89",
-              "priceCurrency": "USD",
-              "url": "https://hypercopilot.vercel.app/pricing"
-            }
-          ]
-        }
+              name: "Studio",
+              price: "89",
+              priceCurrency: "USD",
+              url: "https://hypercopilot.vercel.app/pricing",
+            },
+          ],
+        },
       ],
     }),
   component: PricingPage,
@@ -85,7 +83,12 @@ const plans = [
     name: "Studio",
     price: "$89",
     note: "per seat / month",
-    features: ["Shared workspaces", "Brand kits & HEAVEN presets", "Priority GPUs", "SSO & audit log"],
+    features: [
+      "Shared workspaces",
+      "Brand kits & HEAVEN presets",
+      "Priority GPUs",
+      "SSO & audit log",
+    ],
   },
 ];
 
@@ -101,39 +104,42 @@ function PricingPage() {
             {plans.map((p) => {
               const current = account?.tier === p.tier;
               return (
-              <div
-                key={p.name}
-                className={cn(
-                  "rounded-3xl border border-border bg-surface/60 p-5",
-                  (p.highlight || current) && "ring-spectral bg-surface",
-                )}
-              >
-                <p className="flex items-center justify-between text-[13px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                  {p.name}
-                  {current ? (
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] tracking-normal text-foreground">
-                      Current plan
-                    </span>
-                  ) : null}
-                </p>
-                <p className="mt-3 text-3xl font-extrabold tracking-tight">{p.price}</p>
-                <p className="text-[12px] text-muted-foreground">{p.note}</p>
-                <ul className="mt-4 space-y-2 text-[13px]">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-spectral-3" strokeWidth={2.2} />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  disabled={current}
-                  className="mt-5 w-full rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                <div
+                  key={p.name}
+                  className={cn(
+                    "rounded-3xl border border-border bg-surface/60 p-5",
+                    (p.highlight || current) && "ring-spectral bg-surface",
+                  )}
                 >
-                  {current ? "Your plan" : `Choose ${p.name}`}
-                </button>
-              </div>
+                  <p className="flex items-center justify-between text-[13px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                    {p.name}
+                    {current ? (
+                      <span className="rounded-full border border-border px-2 py-0.5 text-[10px] tracking-normal text-foreground">
+                        Current plan
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="mt-3 text-3xl font-extrabold tracking-tight">{p.price}</p>
+                  <p className="text-[12px] text-muted-foreground">{p.note}</p>
+                  <ul className="mt-4 space-y-2 text-[13px]">
+                    {p.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2">
+                        <Check
+                          className="mt-0.5 h-4 w-4 shrink-0 text-spectral-3"
+                          strokeWidth={2.2}
+                        />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    disabled={current}
+                    className="mt-5 w-full rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                  >
+                    {current ? "Your plan" : `Choose ${p.name}`}
+                  </button>
+                </div>
               );
             })}
           </div>

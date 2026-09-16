@@ -140,18 +140,23 @@ function LibraryPage() {
                   <div className="relative aspect-square bg-surface-2">
                     {a.src ? (
                       a.kind === "Video" ? (
-                        <video src={a.src} controls playsInline className="h-full w-full object-cover" />
+                        <video
+                          src={a.src}
+                          controls
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
                       ) : a.kind === "Audio" ? (
                         <div className="grid h-full w-full place-items-center p-3">
                           <audio src={a.src} controls className="w-full" />
                         </div>
                       ) : (
-                      <img
-                        src={a.src}
-                        alt={a.prompt}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                      />
+                        <img
+                          src={a.src}
+                          alt={a.prompt}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                        />
                       )
                     ) : (
                       <div className="grid h-full w-full place-items-center text-muted-foreground">

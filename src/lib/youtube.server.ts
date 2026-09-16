@@ -6,7 +6,7 @@
  * reads back a plain result — no Google key ever lives in app code.
  */
 
-import { SUPABASE_URL } from "../../supabase/config/config";
+import { SUPABASE_URL } from "@/config";
 
 const YOUTUBE_FUNCTION = `${SUPABASE_URL}/functions/v1/youtube-publish`;
 
@@ -34,7 +34,9 @@ export async function callYouTube<T extends Record<string, unknown>>(
   });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || body["ok"] !== true) {
-    throw new Error(String(body["error"] ?? `The YouTube service refused the request (${res.status}).`));
+    throw new Error(
+      String(body["error"] ?? `The YouTube service refused the request (${res.status}).`),
+    );
   }
   return body as T;
 }

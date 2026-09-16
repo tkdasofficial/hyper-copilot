@@ -123,12 +123,7 @@ export async function threadsReplies(token: string, postId: string) {
 }
 
 /** Publishes a reply to a Threads post. */
-export async function replyToThread(
-  token: string,
-  userId: string,
-  postId: string,
-  text: string,
-) {
+export async function replyToThread(token: string, userId: string, postId: string, text: string) {
   const container = await call(`${THREADS_GRAPH}/${userId}/threads`, "POST", {
     media_type: "TEXT",
     text: text.slice(0, 500),

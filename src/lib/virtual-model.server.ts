@@ -98,7 +98,6 @@ export async function buildCharacterProfile(
 
   const profile = profileFor(input.consistency ?? 92);
 
-
   const images: VirtualModelImage[] = [];
   const paths = new Map<ViewId, string>();
   const refUrls = new Map<ViewId, string>();
@@ -129,11 +128,7 @@ export async function buildCharacterProfile(
     // provider rejects the request, fall back to a prompt-only render so the
     // profile still ends up with all five views instead of stopping at the
     // headshot.
-    const strength = view.portrait
-      ? profile.strength
-      : view.reference === "headshot"
-        ? 0.82
-        : 0.6;
+    const strength = view.portrait ? profile.strength : view.reference === "headshot" ? 0.82 : 0.6;
     const providerUrl = await identityRender({
       prompt: base.prompt,
       negative: IDENTITY_NEGATIVE,
@@ -146,7 +141,6 @@ export async function buildCharacterProfile(
       steps: base.steps,
       guidance: base.guidance,
     });
-
 
     const path = await uploadFromUrl(MODELS_BUCKET, userId, providerUrl);
     paths.set(view.id, path);
@@ -371,7 +365,6 @@ export async function renderCharacterImage(
     // Very high guidance burns detail on this sampler and fights the prompt.
     guidance: Math.min(profile.guidance, 8.5),
   });
-
 
   const path = await uploadFromUrl(GENERATIONS_BUCKET, userId, providerUrl);
   const { data: row, error } = await supabaseAdmin

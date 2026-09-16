@@ -14,10 +14,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       description:
         "Your Hyper Copilot studio: one prompt box for photoreal images, cinematic video, vectors and audio.",
       noindex: true,
-      keywords: [
-        "Hyper Copilot dashboard",
-        "AI studio workspace",
-      ],
+      keywords: ["Hyper Copilot dashboard", "AI studio workspace"],
     }),
   component: Dashboard,
 });

@@ -1,14 +1,14 @@
 # Hyper Copilot
 
-Build a High-tech & Advanced Generative AI Tools Platform. 
+Build a High-tech & Advanced Generative AI Tools Platform.
 
 UI Reference: https://firefly.adobe.com/
 
-Get Inspiration form Adobe FireFly Platform, and build the main UI. 
+Get Inspiration form Adobe FireFly Platform, and build the main UI.
 
 App Name: Hyper Copilot
 
-Use my Uploaded Svg Logos, & Favicon. 
+Use my Uploaded Svg Logos, & Favicon.
 
 Make Sure the Main Screen I want exact Style of Adobe Firefly, and the Chat input box I want Exact Copy.
 
