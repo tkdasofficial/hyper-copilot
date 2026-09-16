@@ -59,39 +59,44 @@ export const manageSocialPost = createServerFn({ method: "POST" })
     const token = conn.access_token;
     const m = await import("@/lib/social-manage.server");
 
-    switch (data.action) {
-      case "update_metadata":
-        if (conn.provider === "youtube") {
-          return m.updateYouTubeVideo(token, data.postId, data.metadata ?? {});
+    const run = async (): Promise<Record<string, unknown>> => {
+        switch (data.action) {
+        case "update_metadata":
+          if (conn.provider === "youtube") {
+            return (await m.updateYouTubeVideo(token, data.postId, data.metadata ?? {})) as unknown as Record<string, unknown>;
+          }
+          if (conn.provider === "instagram") {
+            return (await m.updateInstagramCaption(token, data.postId, data.metadata?.caption ?? "");
+          }
+          return (await m.updateFacebookPost(token, data.postId, data.metadata?.caption ?? "");
+        case "list_comments":
+          return { comments: await m.listComments(token, data.postId) };
+        case "reply_comment":
+          if (conn.provider === "threads") {
+            return (await m.replyToThread(token, conn.external_id, data.postId, data.text ?? "");
+          }
+          return (await m.replyToComment(token, data.commentId ?? data.postId, data.text ?? "");
+        case "hide_comment":
+        case "unhide_comment": {
+          const hide = data.action === "hide_comment";
+          if (conn.provider === "threads") {
+            return (await m.hideThreadsReply(token, data.commentId ?? data.postId, hide);
+          }
+          return (await m.hideComment(token, data.commentId ?? data.postId, hide);
         }
-        if (conn.provider === "instagram") {
-          return m.updateInstagramCaption(token, data.postId, data.metadata?.caption ?? "");
-        }
-        return m.updateFacebookPost(token, data.postId, data.metadata?.caption ?? "");
-      case "list_comments":
-        return { comments: await m.listComments(token, data.postId) };
-      case "reply_comment":
-        if (conn.provider === "threads") {
-          return m.replyToThread(token, conn.external_id, data.postId, data.text ?? "");
-        }
-        return m.replyToComment(token, data.commentId ?? data.postId, data.text ?? "");
-      case "hide_comment":
-      case "unhide_comment": {
-        const hide = data.action === "hide_comment";
-        if (conn.provider === "threads") {
-          return m.hideThreadsReply(token, data.commentId ?? data.postId, hide);
-        }
-        return m.hideComment(token, data.commentId ?? data.postId, hide);
-      }
-      case "delete_comment":
-        return m.deleteComment(token, data.commentId ?? data.postId);
-      case "toggle_comments":
-        return m.setInstagramComments(token, data.postId, data.enabled !== false);
-      case "stats":
-        return { stats: await m.threadsInsights(token, data.postId) };
-      case "replies":
-        return { replies: await m.threadsReplies(token, data.postId) };
-      default:
-        throw new Error("Unsupported action.");
+        case "delete_comment":
+          return (await m.deleteComment(token, data.commentId ?? data.postId);
+        case "toggle_comments":
+          return (await m.setInstagramComments(token, data.postId, data.enabled !== false);
+        case "stats":
+          return { stats: await m.threadsInsights(token, data.postId) };
+        case "replies":
+          return { replies: await m.threadsReplies(token, data.postId) };
+        default:
+          throw new Error("Unsupported action.");
+
+    };
+
+    return { ok: true, result: await run() };
     }
   });
