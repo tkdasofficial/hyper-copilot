@@ -45,7 +45,11 @@ Rules:
 - Hashtags are single words, CamelCase allowed, each starting with #.`;
 
 function clean(text: string, max: number): string {
-  const line = sanitizeText(text).split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
+  const line =
+    sanitizeText(text)
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find(Boolean) ?? "";
   return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
 }
 
@@ -59,9 +63,7 @@ function pick(raw: unknown, tagLimit: number, titleMax: number): PlatformTitle |
 }
 
 /** Generates a unique per-platform title set, or null when unavailable. */
-export async function generatePlatformTitles(
-  source: StorySource,
-): Promise<GeneratedTitles | null> {
+export async function generatePlatformTitles(source: StorySource): Promise<GeneratedTitles | null> {
   const key = process.env["LOVABLE_API_KEY"];
   if (!key) return null;
 
