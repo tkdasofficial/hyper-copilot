@@ -404,7 +404,20 @@ export const disconnectSocialAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("social_connections").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+    const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
+    const { error } = await invokeEdgeFunction("update-record-handler", {
+      userId: context.userId,
+      table: "social_connections",
+      operation: "delete",
+      recordId: data.id,
+    });
+
+    if (error) {
+      const { error: delErr } = await context.supabase
+        .from("social_connections")
+        .delete()
+        .eq("id", data.id);
+      if (delErr) throw new Error(delErr.message);
+    }
     return { ok: true };
   });

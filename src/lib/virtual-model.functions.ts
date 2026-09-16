@@ -40,15 +40,29 @@ export const deleteVirtualModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
-    const storage = await import("@/lib/storage.server");
-    const { data: row } = await context.supabase
-      .from("virtual_models")
-      .select("images")
-      .eq("id", data.id)
-      .maybeSingle();
-    const { error } = await context.supabase.from("virtual_models").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    const paths = ((row?.images as VirtualModelImage[] | null) ?? []).map((i) => i.path);
-    await storage.removeFiles(storage.MODELS_BUCKET, paths);
+    const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
+    const { error } = await invokeEdgeFunction("update-record-handler", {
+      userId: context.userId,
+      table: "virtual_models",
+      operation: "delete",
+      recordId: data.id,
+    });
+
+    if (error) {
+      // Fallback
+      const storage = await import("@/lib/storage.server");
+      const { data: row } = await context.supabase
+        .from("virtual_models")
+        .select("images")
+        .eq("id", data.id)
+        .maybeSingle();
+      const { error: delErr } = await context.supabase
+        .from("virtual_models")
+        .delete()
+        .eq("id", data.id);
+      if (delErr) throw new Error(delErr.message);
+      const paths = ((row?.images as VirtualModelImage[] | null) ?? []).map((i) => i.path);
+      await storage.removeFiles(storage.MODELS_BUCKET, paths);
+    }
     return { ok: true };
   });

@@ -38,4 +38,3 @@ export async function callYouTube<T extends Record<string, unknown>>(
   }
   return data;
 }
-

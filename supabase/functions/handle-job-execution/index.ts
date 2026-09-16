@@ -17,6 +17,29 @@ export type JobExecutionResult = {
   error?: string;
 };
 
+interface JobInput {
+  prompt?: string;
+  aspect?: string;
+  resolution?: string;
+  steps?: number;
+  seed?: number;
+  text?: string;
+  voice?: string;
+  [key: string]: unknown;
+}
+
+interface JobToProcess {
+  id: string;
+  kind: string;
+  user_id?: string;
+  label?: string;
+  input?: JobInput;
+  attempts?: number;
+  max_attempts?: number;
+  generation_id?: string | null;
+  [key: string]: unknown;
+}
+
 /**
  * Enterprise Job Execution Handler for asynchronous studio operations
  * Claims leased background tasks (image/video/model tasks), delegates generation to
@@ -37,7 +60,7 @@ export async function handleJobExecution(options?: {
   const results: JobExecutionResult[] = [];
 
   // Claim due jobs atomically using Postgres RPC or fallback SELECT
-  let jobsToProcess: any[] = [];
+  let jobsToProcess: JobToProcess[] = [];
 
   if (options?.jobId) {
     const { data: job } = await supabase

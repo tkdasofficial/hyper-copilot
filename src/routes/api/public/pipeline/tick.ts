@@ -17,9 +17,14 @@ async function handle(request: Request) {
   if (!(await authorizePipelineRequest(request))) return json({ error: "Unauthorized" }, 401);
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
   const { dispatchPendingRenders } = await import("@/lib/video-agent.server");
   const { runSchedulerPass } = await import("@/lib/workflow-scheduler.server");
   const { runWorkerPass } = await import("@/lib/jobs-worker.server");
+
+  // Trigger edge functions asynchronously for full pipeline execution
+  void invokeEdgeFunction("process-scheduled-cron");
+  void invokeEdgeFunction("handle-job-execution");
 
   const renders = await dispatchPendingRenders(supabaseAdmin, { olderThanSeconds: 30 });
   const workflows = await runSchedulerPass(supabaseAdmin);

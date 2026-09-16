@@ -209,8 +209,18 @@ export const deleteWorkflow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("workflows").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+    const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
+    const { error } = await invokeEdgeFunction("update-record-handler", {
+      userId: context.userId,
+      table: "workflows",
+      operation: "delete",
+      recordId: data.id,
+    });
+
+    if (error) {
+      const { error: delErr } = await context.supabase.from("workflows").delete().eq("id", data.id);
+      if (delErr) throw new Error(delErr.message);
+    }
     return { ok: true };
   });
 
@@ -258,8 +268,11 @@ export const runWorkflowNow = createServerFn({ method: "POST" })
     if (updateError) throw new Error(updateError.message);
     if (!updated) throw new Error("This workflow is already running.");
 
-    // Directly trigger workflow execution from backend
+    // Directly trigger workflow execution from backend to Edge Function
     try {
+      const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
+      void invokeEdgeFunction("process-scheduled-cron", { workflowId: data.id });
+
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { runSchedulerPass } = await import("@/lib/workflow-scheduler.server");
       runSchedulerPass(supabaseAdmin).catch((err) => {

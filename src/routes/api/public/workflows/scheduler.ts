@@ -17,7 +17,12 @@ async function handle(request: Request) {
   const workflowId = typeof body["workflow_id"] === "string" ? body["workflow_id"] : null;
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
   const { runSchedulerPass } = await import("@/lib/workflow-scheduler.server");
+
+  // Trigger process-scheduled-cron edge function
+  void invokeEdgeFunction("process-scheduled-cron", workflowId ? { workflowId } : {});
+
   const handled = await runSchedulerPass(supabaseAdmin, { workflowId });
   return json({ ok: true, handled });
 }

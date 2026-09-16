@@ -13,7 +13,12 @@ async function handle(request: Request) {
   if (!(await authorizePipelineRequest(request))) return json({ error: "Unauthorized" }, 401);
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
   const { runWorkerPass } = await import("@/lib/jobs-worker.server");
+
+  // Trigger edge function for background job processing
+  void invokeEdgeFunction("handle-job-execution");
+
   return json(await runWorkerPass(supabaseAdmin));
 }
 

@@ -132,6 +132,43 @@ export async function publishTo(
     return out.videoId;
   }
 
+  // Attempt backend Edge Function invocation for Meta platforms
+  if (
+    target.provider === "facebook_page" ||
+    target.provider === "instagram" ||
+    target.provider === "threads"
+  ) {
+    try {
+      const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
+      const { data: metaRes, error: metaErr } = await invokeEdgeFunction<{
+        ok?: boolean;
+        results?: {
+          targetId: string;
+          account: string;
+          ok: boolean;
+          postId?: string;
+          error?: string;
+        }[];
+        error?: string;
+      }>("publish-to-meta", {
+        target,
+        action,
+        caption: content.caption,
+        mediaUrl,
+        hookTitle: content.title,
+        category:
+          typeof source === "object" && source ? (source as ContentSource).category : undefined,
+        hashtags: content.tags,
+      });
+
+      if (!metaErr && metaRes?.ok && metaRes.results?.[0]?.postId) {
+        return metaRes.results[0].postId;
+      }
+    } catch {
+      // Graceful fallback to direct Graph API invocation
+    }
+  }
+
   if (target.provider === "facebook_page") {
     if (isVideo) {
       if (!mediaUrl) throw new Error("A video URL is required for a reel.");

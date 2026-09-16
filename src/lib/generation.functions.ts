@@ -96,16 +96,30 @@ export const deleteGeneration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
-    const storage = await import("@/lib/storage.server");
-    const { data: row } = await context.supabase
-      .from("generations")
-      .select("storage_path")
-      .eq("id", data.id)
-      .maybeSingle();
-    const { error } = await context.supabase.from("generations").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    if (row?.storage_path) {
-      await storage.removeFiles(storage.GENERATIONS_BUCKET, [row.storage_path]);
+    const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
+    const { error } = await invokeEdgeFunction("update-record-handler", {
+      userId: context.userId,
+      table: "generations",
+      operation: "delete",
+      recordId: data.id,
+    });
+
+    if (error) {
+      // Graceful fallback to direct context if edge function has a transient issue
+      const storage = await import("@/lib/storage.server");
+      const { data: row } = await context.supabase
+        .from("generations")
+        .select("storage_path")
+        .eq("id", data.id)
+        .maybeSingle();
+      const { error: delErr } = await context.supabase
+        .from("generations")
+        .delete()
+        .eq("id", data.id);
+      if (delErr) throw new Error(delErr.message);
+      if (row?.storage_path) {
+        await storage.removeFiles(storage.GENERATIONS_BUCKET, [row.storage_path]);
+      }
     }
     return { ok: true };
   });

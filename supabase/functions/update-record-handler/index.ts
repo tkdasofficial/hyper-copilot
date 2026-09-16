@@ -60,7 +60,9 @@ export async function updateRecordHandler(params: {
     // If virtual model or generation, clean up storage assets if present
     if (params.table === "virtual_models" && existing.images) {
       const paths = Array.isArray(existing.images)
-        ? existing.images.map((img: any) => img.path).filter(Boolean)
+        ? existing.images
+            .map((img: { path?: string }) => img?.path)
+            .filter((p): p is string => Boolean(p))
         : [];
       if (paths.length > 0) {
         await supabase.storage.from("models").remove(paths);
