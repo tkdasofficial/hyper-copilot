@@ -6,10 +6,6 @@
  * reads back a plain result — no Google key ever lives in app code.
  */
 
-import { SUPABASE_URL } from "@/config";
-
-const YOUTUBE_FUNCTION = `${SUPABASE_URL}/functions/v1/youtube-publish`;
-
 async function workerToken(): Promise<string> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
@@ -27,16 +23,19 @@ export async function callYouTube<T extends Record<string, unknown>>(
   action: string,
   payload: Record<string, unknown> = {},
 ): Promise<T> {
-  const res = await fetch(YOUTUBE_FUNCTION, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-worker-secret": await workerToken() },
-    body: JSON.stringify({ action, ...payload }),
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const secret = await workerToken();
+  const { data, error } = await supabaseAdmin.functions.invoke<T>("youtube-publish", {
+    body: { action, ...payload },
+    headers: { "x-worker-secret": secret },
   });
-  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok || body["ok"] !== true) {
-    throw new Error(
-      String(body["error"] ?? `The YouTube service refused the request (${res.status}).`),
-    );
+  if (error || !data || (data as Record<string, unknown>)["ok"] !== true) {
+    const errorMsg =
+      (data as Record<string, unknown> | null)?.["error"] ??
+      error?.message ??
+      "The YouTube service refused the request.";
+    throw new Error(String(errorMsg));
   }
-  return body as T;
+  return data;
 }
+

@@ -15,11 +15,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { SUPABASE_URL } from "@/config";
 import type { Database } from "@/integrations/supabase/types";
-
-/** Supabase Edge Function that owns the Video Engine credential. */
-const RENDER_DISPATCH_FUNCTION = `${SUPABASE_URL}/functions/v1/video-agent`;
 
 export type VideoRenderConfig = {
   prompt: string;
@@ -66,16 +62,17 @@ async function invokeRenderDispatch(
   }
 
   try {
-    const res = await fetch(RENDER_DISPATCH_FUNCTION, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-worker-secret": workerSecret },
-      body: JSON.stringify({ action: "dispatch", videoId }),
+    const { data: payload, error: invokeErr } = await admin.functions.invoke<{
+      ok?: boolean;
+      error?: string;
+    }>("video-agent", {
+      body: { action: "dispatch", videoId },
+      headers: { "x-worker-secret": workerSecret },
     });
-    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-    if (!res.ok || payload.ok !== true) {
+    if (invokeErr || !payload || payload.ok !== true) {
       return {
         ok: false,
-        error: payload.error ?? `The render service refused the job (${res.status}).`,
+        error: payload?.error ?? invokeErr?.message ?? "The render service refused the job.",
       };
     }
     return { ok: true };

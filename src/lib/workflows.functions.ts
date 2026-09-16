@@ -258,5 +258,16 @@ export const runWorkflowNow = createServerFn({ method: "POST" })
     if (updateError) throw new Error(updateError.message);
     if (!updated) throw new Error("This workflow is already running.");
 
+    // Directly trigger workflow execution from backend
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { runSchedulerPass } = await import("@/lib/workflow-scheduler.server");
+      runSchedulerPass(supabaseAdmin).catch((err) => {
+        console.warn("[Workflows] Immediate scheduler pass error:", err);
+      });
+    } catch {
+      // Non-blocking fallback
+    }
+
     return { status: "queued" as const };
   });

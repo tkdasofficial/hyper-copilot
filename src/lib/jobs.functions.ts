@@ -19,6 +19,30 @@ export const enqueueJob = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+
+    // Standardize direct backend invocation to handle-job-execution edge function
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: runner } = await supabaseAdmin
+        .from("job_runner")
+        .select("worker_token")
+        .eq("id", "default")
+        .maybeSingle();
+      const token = runner?.worker_token?.trim();
+      if (token) {
+        supabaseAdmin.functions
+          .invoke("handle-job-execution", {
+            body: { jobId: row.id },
+            headers: { "x-worker-secret": token },
+          })
+          .catch((err) => {
+            console.warn("[Jobs] Direct edge function execution error:", err);
+          });
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+
     return { id: row.id as string };
   });
 

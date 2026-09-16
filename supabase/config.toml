@@ -1,1 +1,31 @@
 project_id = "uqyuwxztevkokzqldibh"
+
+[functions.generate-audio]
+verify_jwt = false
+
+[functions.generate-image]
+verify_jwt = false
+
+[functions.generate-video]
+verify_jwt = false
+
+[functions.handle-job-execution]
+verify_jwt = false
+
+[functions.process-scheduled-cron]
+verify_jwt = false
+
+[functions.publish-to-meta]
+verify_jwt = false
+
+[functions.sync-meta-secrets]
+verify_jwt = false
+
+[functions.update-record-handler]
+verify_jwt = false
+
+[functions.video-agent]
+verify_jwt = false
+
+[functions.youtube-publish]
+verify_jwt = false

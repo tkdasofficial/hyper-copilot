@@ -59,8 +59,13 @@ export const startVideoRender = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
-    const { createVideoRequest } = await import("@/lib/video-agent.server");
+    const { createVideoRequest, dispatchVideoRender } = await import("@/lib/video-agent.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const videoId = await createVideoRequest(context.supabase, context.userId, data);
+    // Standardize direct backend invocation to the edge function
+    dispatchVideoRender(supabaseAdmin, videoId).catch((err) => {
+      console.warn("[VideoAgent] Async render dispatch error:", err);
+    });
     return { videoId };
   });
 
