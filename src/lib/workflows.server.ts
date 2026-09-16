@@ -4,8 +4,18 @@
  * out when a schedule is next due.
  */
 
-import { GRAPH_VERSION, type ActionType, type CreationConfig, defaultCreationConfig } from "@/lib/social.shared";
+import {
+  GRAPH_VERSION,
+  type ActionType,
+  type CreationConfig,
+  type SocialProvider,
+  defaultCreationConfig,
+} from "@/lib/social.shared";
 import { normalizeArtStyle, normalizeImageStyle } from "@/lib/style-presets";
+import { buildPlatformContent, type ContentSource } from "@/lib/publish-content";
+
+export { buildPlatformContent, buildPublishCaption, sanitizeText } from "@/lib/publish-content";
+export type { ContentSource, ContentSource as CaptionSource } from "@/lib/publish-content";
 
 const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const THREADS_GRAPH = "https://graph.threads.net/v1.0";
