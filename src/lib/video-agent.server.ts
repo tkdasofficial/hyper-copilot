@@ -88,14 +88,17 @@ async function invokeRenderDispatch(
 async function readCredits(supabase: Client, userId: string) {
   const { data: sub } = await supabase
     .from("subscriptions")
-    .select("monthly_quota, credits_used, video_credits")
+    .select("monthly_quota, credits_used, video_credits, tier")
     .eq("user_id", userId)
     .maybeSingle();
-  if (!sub) return null;
-  const videoCredits = sub.video_credits ?? 0;
-  const creditsUsed = sub.credits_used ?? 0;
-  const remainingQuota = Math.max((sub.monthly_quota ?? 0) - creditsUsed, 0);
-  return { videoCredits, creditsUsed, remainingQuota };
+
+  // Personal use mode: always treat credits and quotas as completely unlimited
+  return {
+    videoCredits: 999999,
+    creditsUsed: sub?.credits_used ?? 0,
+    remainingQuota: 999999,
+    isUnlimited: true,
+  };
 }
 
 /**
@@ -109,7 +112,7 @@ export async function createVideoRequest(
 ): Promise<string> {
   const credits = await readCredits(supabase, userId);
   if (!credits) throw new Error("No active plan was found on your account.");
-  if (credits.videoCredits <= 0 && credits.remainingQuota <= 0) {
+  if (!credits.isUnlimited && credits.videoCredits <= 0 && credits.remainingQuota <= 0) {
     throw new Error("You are out of render credits. Upgrade your plan to keep creating videos.");
   }
 
@@ -155,23 +158,26 @@ export async function dispatchVideoRender(
     return "failed" as const;
   };
 
-  // a. Credit reservation (video credits first, then the monthly quota).
+  // a. Credit reservation: for personal/unlimited mode, credits are not decremented.
   const credits = await readCredits(admin, userId);
   if (!credits) return fail("No active plan was found on your account.");
-  if (credits.videoCredits <= 0 && credits.remainingQuota <= 0) {
+  if (!credits.isUnlimited && credits.videoCredits <= 0 && credits.remainingQuota <= 0) {
     return fail("You are out of render credits. Upgrade your plan to keep creating videos.");
   }
-  const spend =
-    credits.videoCredits > 0
-      ? { video_credits: credits.videoCredits - 1 }
-      : { credits_used: credits.creditsUsed + 1 };
-  const { error: spendError } = await admin
-    .from("subscriptions")
-    .update(spend)
-    .eq("user_id", userId);
-  if (spendError) return fail("Could not reserve a render credit. Please try again.");
+  if (!credits.isUnlimited) {
+    const spend =
+      credits.videoCredits > 0
+        ? { video_credits: credits.videoCredits - 1 }
+        : { credits_used: credits.creditsUsed + 1 };
+    const { error: spendError } = await admin
+      .from("subscriptions")
+      .update(spend)
+      .eq("user_id", userId);
+    if (spendError) return fail("Could not reserve a render credit. Please try again.");
+  }
 
   const refund = async () => {
+    if (credits.isUnlimited) return;
     await admin
       .from("subscriptions")
       .update(

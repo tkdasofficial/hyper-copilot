@@ -39,23 +39,25 @@ export const getMyAccount = createServerFn({ method: "GET" })
 
     if (!profile && !sub) return null;
 
-    const quota = sub?.monthly_quota ?? 0;
-    const used = sub?.credits_used ?? 0;
+    // Personal use mode: always unlimited
+    const isUnlimited = true;
+    const quota = isUnlimited ? 999999 : (sub?.monthly_quota ?? 0);
+    const used = isUnlimited ? 0 : (sub?.credits_used ?? 0);
 
     return {
       name: profile?.full_name ?? profile?.email ?? "",
       email: profile?.email ?? "",
       avatarUrl: profile?.avatar_url ?? null,
       onboardingCompleted: Boolean(profile?.onboarding_completed),
-      tier: sub?.tier ?? "free",
-      paymentStatus: sub?.payment_status ?? "inactive",
-      credits: Math.max(quota - used, 0),
+      tier: "unlimited",
+      paymentStatus: "active",
+      credits: 999999,
       quota,
       used,
-      imageCredits: sub?.image_credits ?? 0,
-      videoCredits: sub?.video_credits ?? 0,
-      audioCredits: sub?.audio_credits ?? 0,
-      periodEnd: sub?.current_period_end ?? null,
-      cancelAtPeriodEnd: Boolean(sub?.cancel_at_period_end),
+      imageCredits: 999999,
+      videoCredits: 999999,
+      audioCredits: 999999,
+      periodEnd: null,
+      cancelAtPeriodEnd: false,
     };
   });
