@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { pageHead } from "@/lib/seo";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/config";
 import { completeOnboarding } from "@/lib/profile.functions";
 import { Logo } from "@/components/hyper/Logo";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,20 @@ function GettingReady() {
   const [purpose, setPurpose] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      if (profile?.onboarding_completed) {
+        navigate({ to: "/copilot", replace: true });
+      }
+    });
+  }, [navigate]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!role || !purpose) {
@@ -76,7 +91,7 @@ function GettingReady() {
     setBusy(true);
     try {
       await completeOnboarding({ data: { full_name: fullName.trim(), role, purpose } });
-      navigate({ to: "/dashboard", replace: true });
+      navigate({ to: "/copilot", replace: true });
     } catch {
       toast.error("We couldn't save your details. Please try again.");
     } finally {

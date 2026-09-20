@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { pageHead } from "@/lib/seo";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Loader2, Lock, Mail, UserRound } from "lucide-react";
@@ -60,7 +60,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function routeAfterLogin() {
+  const routeAfterLogin = useCallback(async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
     const { data: profile } = await supabase
@@ -70,10 +70,18 @@ function AuthPage() {
       .maybeSingle();
 
     navigate({
-      to: profile?.onboarding_completed ? "/dashboard" : "/getting-ready",
+      to: profile?.onboarding_completed ? "/copilot" : "/getting-ready",
       replace: true,
     });
-  }
+  }, [navigate]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) {
+        void routeAfterLogin();
+      }
+    });
+  }, [routeAfterLogin]);
 
   async function onContinueEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -168,7 +176,7 @@ function AuthPage() {
           ? "You're in as a guest."
           : "Guest preview — sign up when you're ready to generate.",
       );
-      navigate({ to: "/dashboard", replace: true });
+      navigate({ to: "/copilot", replace: true });
     } finally {
       setBusy(false);
     }

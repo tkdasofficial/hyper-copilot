@@ -6,7 +6,8 @@ import { useRouter } from "@tanstack/react-router";
  * sidebar/drawer navigation swaps instantly instead of downloading on tap.
  */
 const ROUTES = [
-  "/dashboard",
+  "/copilot",
+  "/copilot/history",
   "/image",
   "/virtual-model",
   "/video",

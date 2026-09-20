@@ -204,7 +204,10 @@ export async function pixazoStartVideo(input: {
   width?: number | undefined;
   height?: number | undefined;
 }): Promise<string> {
-  const path = input.imageUrl ? "/ltx-video/v1/image-to-video" : "/ltx-video/v1/text-to-video";
+  const endpoints = input.imageUrl
+    ? ["/ltx-2-5-free/v1/image-to-video", "/ltx-video/v1/image-to-video"]
+    : ["/ltx-2-5-free/v1/text-to-video", "/ltx-video/v1/text-to-video"];
+
   const body = {
     prompt: input.prompt,
     ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
@@ -216,23 +219,32 @@ export async function pixazoStartVideo(input: {
     ...(input.frameRate ? { frame_rate: input.frameRate } : {}),
     ...(input.width && input.height ? { width: input.width, height: input.height } : {}),
   };
-  let data: { request_id?: string };
-  try {
-    data = await pixazoPost<{ request_id?: string }>(path, body);
-  } catch (err) {
-    // Some deployments reject the optional sizing/end-frame fields; retry minimal.
-    const minimal = {
-      prompt: input.prompt,
-      ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
-      ...(input.negative ? { negative: input.negative } : {}),
-      ...(input.frames ? { num_frames: input.frames } : {}),
-      ...(input.frameRate ? { frame_rate: input.frameRate } : {}),
-    };
-    if (JSON.stringify(minimal) === JSON.stringify(body)) throw err;
-    data = await pixazoPost<{ request_id?: string }>(path, minimal);
+  let lastErr: unknown;
+  for (const path of endpoints) {
+    try {
+      const data = await pixazoPost<{ request_id?: string; requestId?: string }>(path, body);
+      const reqId = data.request_id ?? data.requestId;
+      if (reqId) return reqId;
+    } catch (err) {
+      lastErr = err;
+      // Some deployments reject optional fields; try minimal body
+      const minimal = {
+        prompt: input.prompt,
+        ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
+        ...(input.negative ? { negative: input.negative } : {}),
+        ...(input.frames ? { num_frames: input.frames } : {}),
+        ...(input.frameRate ? { frame_rate: input.frameRate } : {}),
+      };
+      try {
+        const data = await pixazoPost<{ request_id?: string; requestId?: string }>(path, minimal);
+        const reqId = data.request_id ?? data.requestId;
+        if (reqId) return reqId;
+      } catch (subErr) {
+        lastErr = subErr;
+      }
+    }
   }
-  if (!data.request_id) throw new Error("Video provider returned no job id");
-  return data.request_id;
+  throw lastErr instanceof Error ? lastErr : new Error("Video provider returned no job id");
 }
 
 export type VideoJob = { status: string; url?: string | undefined; error?: string | undefined };
@@ -352,4 +364,88 @@ export async function lovableMusic(input: {
   }
   const bytes = new Uint8Array(await res.arrayBuffer());
   return { bytes, contentType: res.headers.get("content-type") ?? "audio/wav" };
+}
+
+/**
+ * Text-To-Text: Nvidia Nemotron 3 Ultra (nemotron-3-ultra-550b-a55b).
+ * Provides intelligent conversational AI, creative brainstorms, video scripts, and copy.
+ */
+export async function nvidiaNemotronText(input: {
+  prompt?: string;
+  messages?: Array<{ role: string; content: string }>;
+  systemPrompt?: string;
+}): Promise<{ text: string; model: string }> {
+  let apiKey = "";
+  try {
+    apiKey = await providerSecret("NVIDIA_API_KEY");
+  } catch {
+    apiKey = (process.env["NVIDIA_API_KEY"] ?? "").trim();
+  }
+
+  if (!apiKey) {
+    throw new Error("NVIDIA_API_KEY is not configured in backend secrets.");
+  }
+
+  const messages: Array<{ role: string; content: string }> = [];
+  const system =
+    input.systemPrompt ??
+    "You are Copilot, a brilliant AI creative assistant. You excel at high-retention video scripts, social media hooks, marketing campaign strategies, and multimodal ideation. Always format your responses cleanly with markdown when appropriate.";
+
+  messages.push({ role: "system", content: system });
+
+  if (input.messages && input.messages.length > 0) {
+    for (const msg of input.messages) {
+      if (msg.role !== "system" && msg.content?.trim()) {
+        messages.push({ role: msg.role, content: msg.content.trim() });
+      }
+    }
+  }
+
+  if (
+    input.prompt &&
+    (!messages.length || messages[messages.length - 1]?.content !== input.prompt)
+  ) {
+    messages.push({ role: "user", content: input.prompt });
+  }
+
+  const models = ["nvidia/nemotron-3-ultra-550b-a55b", "nemotron-3-ultra-550b-a55b"];
+
+  let lastError: Error | null = null;
+  for (const model of models) {
+    try {
+      const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.6,
+          top_p: 0.8,
+          max_tokens: 2048,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Nvidia Nemotron error (${res.status}): ${text.slice(0, 300)}`);
+      }
+
+      const json = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const reply = json.choices?.[0]?.message?.content ?? "";
+      if (!reply) throw new Error("Nvidia Nemotron returned an empty response.");
+      return { text: reply, model };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (!lastError.message.includes("404") && !lastError.message.includes("model")) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError ?? new Error("Failed to call Nvidia Nemotron 3 Ultra.");
 }

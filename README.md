@@ -7,6 +7,7 @@ Hyper Copilot is an all-in-one multi-modal generative AI platform and automated 
 ## Key Features
 
 ### 1. Multi-Modal Generative AI Studio
+
 - **Text to Image**: High-resolution image synthesis with custom aspect ratios, styles, and prompt refinement, featuring an Adobe Firefly-inspired creative canvas and prompt interface.
 - **Text to Video & Motion**: Generate dynamic cinematic video clips from natural language prompts, complete with motion templates, camera control, and aspect ratio configuration.
 - **Text to Audio & Speech**: High-clarity multi-speaker voice synthesis with customizable voice personas, genders, pitch, and speech rates.
@@ -14,6 +15,7 @@ Hyper Copilot is an all-in-one multi-modal generative AI platform and automated 
 - **Autonomous Video Agent**: End-to-end automated pipeline transforming concepts and scripts into polished video assets.
 
 ### 2. Social Automation & Multi-Platform Publishing
+
 - **Targeted Platform Distribution**:
   - **YouTube & YouTube Shorts**: Native upload support with category selection (Entertainment default) and automated hashtag insertion adhering to the strict 100-character title limit.
   - **Meta (Instagram & Facebook Reels)**: Narrative-driven hooks, automatic lead caption extraction, and 4–5 targeted high-reach hashtags.
@@ -23,6 +25,7 @@ Hyper Copilot is an all-in-one multi-modal generative AI platform and automated 
 - **Connected Accounts & OAuth Hub**: Secure OAuth integrations for Meta (Facebook & Instagram), Threads, and YouTube with token lifecycle tracking.
 
 ### 3. Unified Asset Library & Job Runner
+
 - **Central Creative Library**: Filterable repository of generated images, videos, audio clips, and model headshots with direct downloading, re-prompting, and publishing actions.
 - **Asynchronous Job Execution**: Distributed job processing engine with lease locking, retry logic, and real-time generation progress updates.
 

@@ -271,7 +271,7 @@ async function processWorkflow(admin: Admin, raw: WorkflowRow, nowIso: string): 
       category: creation.category,
       script: videoPrompt || raw.caption || creation.instructions || raw.name,
       story: videoPrompt || raw.caption || creation.instructions,
-      prompt: videoPrompt,
+      prompt: videoPrompt ?? null,
       instructions: creation.instructions,
       ...(generatedTitles ? { generatedTitles } : {}),
     };

@@ -464,7 +464,9 @@ function buildMetaReelsContent(
   // 4 to 5 highly relevant targeted hashtags
   const metaTags = tagsPool.slice(0, 5);
   while (metaTags.length < 4 && tagsPool.length > metaTags.length) {
-    metaTags.push(tagsPool[metaTags.length]);
+    const next = tagsPool[metaTags.length];
+    if (!next) break;
+    metaTags.push(next);
   }
 
   const firstNarrativeSentence = cleanStory.split(/[.!?\n]/)[0]?.trim();

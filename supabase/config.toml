@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.youtube-publish]
 verify_jwt = false
+
+[functions.copilot]
+verify_jwt = false

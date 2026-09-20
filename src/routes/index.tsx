@@ -107,7 +107,7 @@ function Landing() {
   const { session, loading } = useSession();
 
   useEffect(() => {
-    if (!loading && session) navigate({ to: "/dashboard", replace: true });
+    if (!loading && session) navigate({ to: "/copilot", replace: true });
   }, [loading, session, navigate]);
 
   return (

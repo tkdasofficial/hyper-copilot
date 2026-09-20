@@ -127,7 +127,7 @@ async function exchangeFacebookCode(
     grant_type: "fb_exchange_token",
     client_id: credentials.appId,
     client_secret: credentials.appSecret,
-    fb_exchange_token: short.access_token,
+    fb_exchange_token: short.access_token ?? "",
   });
   const long = await graphJson(`${GRAPH}/oauth/access_token?${longParams.toString()}`);
   return {
@@ -216,8 +216,8 @@ async function collectPages(
         `${GRAPH}/me/businesses?fields=${encodeURIComponent(`owned_pages{${PAGE_FIELDS}},client_pages{${PAGE_FIELDS}}`)}&limit=50&access_token=${token}`,
       );
       for (const biz of (businesses.data as Array<Record<string, { data?: unknown[] }>>) ?? []) {
-        absorb(biz?.owned_pages?.data);
-        absorb(biz?.client_pages?.data);
+        absorb(biz?.["owned_pages"]?.data);
+        absorb(biz?.["client_pages"]?.data);
       }
     } catch {
       /* business_management not granted — nothing more to try */
@@ -275,12 +275,14 @@ async function discoverAccounts(
     }));
   }
 
+  type IgAccount = { id?: string; username?: string; profile_picture_url?: string };
   return list
     .map((page) => ({
       page,
-      ig: page.instagram_business_account ?? page.connected_instagram_account,
+      ig: (page.instagram_business_account ?? page.connected_instagram_account) as
+        IgAccount | undefined,
     }))
-    .filter((entry) => entry.ig?.id)
+    .filter((entry): entry is { page: MetaPageRecord; ig: IgAccount } => Boolean(entry.ig?.id))
     .map(({ page, ig }) => ({
       externalId: String(ig.id),
       displayName: ig.username ?? page.name ?? null,
@@ -324,10 +326,11 @@ async function explainEmptyDiscovery(
     const debug = await graphJson(
       `${GRAPH}/debug_token?input_token=${token}&access_token=${encodeURIComponent(appToken)}`,
     );
-    const granular = Array.isArray(debug?.data?.granular_scopes) ? debug.data.granular_scopes : [];
-    const pageGrant = granular.find(
-      (scope: { scope?: string }) => scope?.scope === "pages_show_list",
-    ) as { scope?: string; target_ids?: unknown[] } | undefined;
+    const debugData = debug?.data as { granular_scopes?: unknown } | undefined;
+    const granular = (
+      Array.isArray(debugData?.granular_scopes) ? debugData.granular_scopes : []
+    ) as Array<{ scope?: string; target_ids?: unknown[] }>;
+    const pageGrant = granular.find((scope) => scope?.scope === "pages_show_list");
     if (pageGrant && (!Array.isArray(pageGrant.target_ids) || pageGrant.target_ids.length === 0)) {
       return "Meta granted Page permission but shared no Page with Hyper Copilot. Connect again and select at least one Page in Meta's Page picker.";
     }
