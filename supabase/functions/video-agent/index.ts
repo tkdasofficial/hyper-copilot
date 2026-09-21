@@ -134,6 +134,32 @@ Deno.serve(async (req: Request) => {
       if (!githubPat)
         throw new Error("GITHUB_PAT secret is not configured in Supabase environment.");
 
+      const isLong =
+        body.mode === "long" ||
+        video.aspect_ratio === "16:9" ||
+        Number(video.duration_seconds) > 60 ||
+        (video.aspect_ratio !== "9:16" && Number(video.duration_seconds) >= 60) ||
+        (typeof video.voice_persona === "string" &&
+          video.voice_persona.toLowerCase().includes("documentary"));
+      const eventType = isLong ? "long_form" : "short_form";
+
+      const payload: Record<string, string> = {
+        video_id: video.id,
+        user_id: video.user_id,
+        prompt: video.prompt || "",
+        negative_prompt: video.negative_prompt ?? "",
+        voice_gender: video.voice_gender ?? "male",
+        image_style: video.image_style ?? "Cinematic 3D",
+        aspect_ratio: video.aspect_ratio || (isLong ? "16:9" : "9:16"),
+        duration_seconds: String(video.duration_seconds || (isLong ? 300 : 15)),
+        captions: video.captions ? captionSizeToken(video.caption_style) : "false",
+      };
+      if (isLong) {
+        payload.voice_persona = video.voice_persona ?? "Cosmic Documentary";
+      } else {
+        payload.caption_scale = String(video.caption_scale ?? 4);
+      }
+
       // Dispatch to GitHub Video Engine
       const res = await fetch(GITHUB_DISPATCH_URL, {
         method: "POST",
@@ -145,19 +171,8 @@ Deno.serve(async (req: Request) => {
           "User-Agent": "hyper-copilot-video-agent-edge",
         },
         body: JSON.stringify({
-          event_type: GITHUB_DISPATCH_EVENT,
-          client_payload: {
-            video_id: video.id,
-            user_id: video.user_id,
-            prompt: video.prompt,
-            negative_prompt: video.negative_prompt,
-            voice_gender: video.voice_gender,
-            image_style: video.image_style,
-            aspect_ratio: video.aspect_ratio,
-            duration_seconds: String(video.duration_seconds),
-            captions: video.captions ? captionSizeToken(video.caption_style) : "false",
-            caption_scale: String(video.caption_scale ?? 4),
-          },
+          event_type: eventType,
+          client_payload: payload,
         }),
       });
 
@@ -234,6 +249,31 @@ Deno.serve(async (req: Request) => {
     let dispatched = false;
     if (githubPat && body.dispatch !== false) {
       try {
+        const isLongB =
+          body.mode === "long" ||
+          videoConfig.aspect_ratio === "16:9" ||
+          Number(videoConfig.duration_seconds) > 60 ||
+          (typeof videoConfig.voice_persona === "string" &&
+            videoConfig.voice_persona.toLowerCase().includes("documentary"));
+        const eventTypeB = isLongB ? "long_form" : "short_form";
+
+        const payloadB: Record<string, string> = {
+          video_id: newVideoId,
+          user_id: userId,
+          prompt: videoConfig.prompt,
+          negative_prompt: videoConfig.negative_prompt,
+          voice_gender: videoConfig.voice_gender,
+          image_style: videoConfig.image_style,
+          aspect_ratio: videoConfig.aspect_ratio,
+          duration_seconds: String(videoConfig.duration_seconds),
+          captions: videoConfig.captions ? captionSizeToken(videoConfig.caption_style) : "false",
+        };
+        if (isLongB) {
+          payloadB.voice_persona = videoConfig.voice_persona;
+        } else {
+          payloadB.caption_scale = String(videoConfig.caption_scale ?? 4);
+        }
+
         const ghRes = await fetch(GITHUB_DISPATCH_URL, {
           method: "POST",
           headers: {
@@ -244,21 +284,8 @@ Deno.serve(async (req: Request) => {
             "User-Agent": "hyper-copilot-video-agent-edge",
           },
           body: JSON.stringify({
-            event_type: GITHUB_DISPATCH_EVENT,
-            client_payload: {
-              video_id: newVideoId,
-              user_id: userId,
-              prompt: videoConfig.prompt,
-              negative_prompt: videoConfig.negative_prompt,
-              voice_gender: videoConfig.voice_gender,
-              image_style: videoConfig.image_style,
-              aspect_ratio: videoConfig.aspect_ratio,
-              duration_seconds: String(videoConfig.duration_seconds),
-              captions: videoConfig.captions
-                ? captionSizeToken(videoConfig.caption_style)
-                : "false",
-              caption_scale: String(videoConfig.caption_scale ?? 4),
-            },
+            event_type: eventTypeB,
+            client_payload: payloadB,
           }),
         });
 

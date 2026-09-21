@@ -84,9 +84,9 @@ function CopilotEmptyStatePage() {
   };
 
   return (
-    <CopilotShell active="new">
-      <section className="relative flex min-h-[calc(100vh-110px)] flex-col justify-between">
-        <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-4 pb-36 pt-8 text-center sm:px-6">
+    <CopilotShell active="new" fullHeight>
+      <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden justify-between">
+        <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-4 pb-36 pt-8 text-center sm:px-6 overflow-y-auto">
           {/* App Icon (dark / light responsive) */}
           <AppIcon className="h-12 w-12 rounded-2xl shadow-sm ring-1 ring-border/40 animate-in fade-in zoom-in-95 duration-300" />
 
@@ -131,7 +131,7 @@ function CopilotEmptyStatePage() {
           attachment={attachment}
           onAttachmentChange={setAttachment}
         />
-      </section>
+      </div>
     </CopilotShell>
   );
 }

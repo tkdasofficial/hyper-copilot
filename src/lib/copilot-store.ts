@@ -283,6 +283,107 @@ function updateMessageStatus(chatId: string, messageId: string, updates: Partial
   });
 }
 
+/**
+ * Detect user intent flexibly without hijacking regular questions
+ * that happen to contain words like "speak", "draw", "video", "picture", etc.
+ */
+export function detectCopilotIntent(
+  prompt: string,
+  attachmentUrl?: string,
+): {
+  action: CopilotActionType;
+  cleanPrompt: string;
+  displayCaption?: string;
+} {
+  const trimmed = prompt.trim();
+
+  // 1. Explicit Slash Commands
+  if (/^\/(image|img|draw|art)\b/i.test(trimmed)) {
+    const clean = trimmed.replace(/^\/(image|img|draw|art)\s*/i, "").trim();
+    return {
+      action: "text-to-image",
+      cleanPrompt: clean,
+      displayCaption: clean ? `Generated image for "${clean}"` : "Generated image",
+    };
+  }
+
+  if (/^\/(video|clip)\b/i.test(trimmed)) {
+    const clean = trimmed.replace(/^\/(video|clip)\s*/i, "").trim();
+    return {
+      action: "image-to-video",
+      cleanPrompt: clean,
+      displayCaption: clean ? `Rendered video for "${clean}"` : "Rendered video",
+    };
+  }
+
+  if (/^\/(audio|tts|voice|speech)\b/i.test(trimmed)) {
+    const clean = trimmed.replace(/^\/(audio|tts|voice|speech)\s*/i, "").trim();
+    return {
+      action: "text-to-audio",
+      cleanPrompt: clean,
+      displayCaption: clean ? `Generated audio for "${clean}"` : "Generated audio",
+    };
+  }
+
+  // 2. Attached image analysis
+  if (
+    attachmentUrl &&
+    !/^(?:please\s+)?(?:generate|create|render|make)\s+(?:an?\s+)?(?:video|animation)/i.test(
+      trimmed,
+    )
+  ) {
+    return {
+      action: "image-analyse",
+      cleanPrompt: trimmed,
+    };
+  }
+
+  // 3. Strict Natural Language Media Commands (only if user explicitly commands media asset generation)
+  const imageGenMatch = trimmed.match(
+    /^(?:please\s+)?(?:generate|create|render|paint|produce)\s+(?:an?\s+)?(?:image|picture|photo|illustration|artwork|wallpaper)\s+(?:of|for|showing|depicting)\s+(.+)$/i,
+  );
+  if (imageGenMatch && imageGenMatch[1]) {
+    const subject = imageGenMatch[1].trim();
+    return {
+      action: "text-to-image",
+      cleanPrompt: subject,
+      displayCaption: `Generated image for "${subject}"`,
+    };
+  }
+
+  const videoGenMatch = trimmed.match(
+    /^(?:please\s+)?(?:generate|create|render|produce|make)\s+(?:an?\s+)?(?:video|animation|cinematic video|motion video)\s+(?:of|for|showing|depicting)\s+(.+)$/i,
+  );
+  if (videoGenMatch && videoGenMatch[1]) {
+    const subject = videoGenMatch[1].trim();
+    return {
+      action: "image-to-video",
+      cleanPrompt: subject,
+      displayCaption: `Rendered video for "${subject}"`,
+    };
+  }
+
+  const audioGenMatch = trimmed.match(
+    /^(?:please\s+)?(?:generate|create|synthesize|produce)\s+(?:an?\s+)?(?:audio|speech|voiceover|voice clip|spoken audio)\s+(?:of|for|reading|saying)\s+(.+)$/i,
+  );
+  if (audioGenMatch && audioGenMatch[1]) {
+    const subject = audioGenMatch[1].trim();
+    return {
+      action: "text-to-audio",
+      cleanPrompt: subject,
+      displayCaption: `Generated audio for "${subject}"`,
+    };
+  }
+
+  // 4. Default to Conversational Text Chat
+  // Regular questions like "can you speak French?", "draw a comparison...", "explain Brownian motion", "write a video script"
+  // will ALL go to flexible AI chat text routing!
+  return {
+    action: "text",
+    cleanPrompt: trimmed.replace(/^\/(chat|ask)\s*/i, "").trim(),
+  };
+}
+
 async function dispatchCopilotCall(
   chatId: string,
   prompt: string,
@@ -290,54 +391,16 @@ async function dispatchCopilotCall(
   attachmentUrl?: string,
 ) {
   const normalized = normalizeModel(model);
+  const modelTier: "speed" | "flash" | "heavy" =
+    normalized === "copilot-speed" ? "speed" : normalized === "copilot-heavy" ? "heavy" : "flash";
 
-  let action: CopilotActionType = "text";
-  let modelTier: "speed" | "flash" | "heavy" = "flash";
+  // Intelligently detect action without falsely hijacking regular conversation
+  const intent = detectCopilotIntent(prompt, attachmentUrl);
+  let action: CopilotActionType = intent.action;
 
-  if (normalized === "copilot-speed") {
+  // If on copilot-speed tier, keep purely text for maximum speed
+  if (normalized === "copilot-speed" && action !== "image-analyse") {
     action = "text";
-    modelTier = "speed";
-  } else if (normalized === "copilot-flash") {
-    modelTier = "flash";
-    if (attachmentUrl) {
-      action = "image-analyse";
-    } else if (
-      /^\/audio\b|generate audio|text to audio|text to speech|speak\b|voiceover|read aloud/i.test(
-        prompt,
-      )
-    ) {
-      action = "text-to-audio";
-    } else if (
-      /^\/image\b|generate image|draw\b|render image|picture of\b|create an image/i.test(prompt)
-    ) {
-      action = "text-to-image";
-    } else {
-      action = "text";
-    }
-  } else {
-    modelTier = "heavy";
-    if (
-      /^\/video\b|generate video|animate\b|motion\b|make a video|render video|create video/i.test(
-        prompt,
-      ) ||
-      (attachmentUrl && /video|animate|motion|cinematic/i.test(prompt))
-    ) {
-      action = "image-to-video";
-    } else if (
-      /^\/audio\b|generate audio|text to audio|text to speech|speak\b|voiceover|read aloud/i.test(
-        prompt,
-      )
-    ) {
-      action = "text-to-audio";
-    } else if (attachmentUrl) {
-      action = "image-analyse";
-    } else if (
-      /^\/image\b|generate image|draw\b|render image|picture of\b|create an image/i.test(prompt)
-    ) {
-      action = "text-to-image";
-    } else {
-      action = "text";
-    }
   }
 
   const currentChat = state.chats.find((c) => c.id === chatId);
@@ -349,7 +412,7 @@ async function dispatchCopilotCall(
     const result = await executeCopilotApi({
       action,
       modelTier,
-      prompt,
+      prompt: intent.cleanPrompt || prompt,
       messages: historyMessages,
       imageUrl: attachmentUrl,
     });
@@ -362,9 +425,7 @@ async function dispatchCopilotCall(
       const assistantMsg: CopilotMessage = {
         id: makeId(),
         role: "assistant",
-        text: prompt
-          ? `Generated audio for: "${prompt.replace(/^\/(audio|tts)\s*/i, "")}"`
-          : "Generated audio.",
+        text: intent.displayCaption || `Generated audio for: "${intent.cleanPrompt || prompt}"`,
         audioUrl: result.audioUrl,
         mediaType: "audio",
         modelName: "Copilot Voice",
@@ -375,7 +436,7 @@ async function dispatchCopilotCall(
       const assistantMsg: CopilotMessage = {
         id: makeId(),
         role: "assistant",
-        text: prompt,
+        text: intent.displayCaption || `Generated image for: "${intent.cleanPrompt || prompt}"`,
         imageUrl: result.imageUrl,
         mediaType: "image",
         modelName: "Copilot Image",
@@ -387,9 +448,7 @@ async function dispatchCopilotCall(
       const initialMsg: CopilotMessage = {
         id: makeId(),
         role: "assistant",
-        text: prompt
-          ? `Rendering video: "${prompt.replace(/^\/video\s*/i, "")}"`
-          : "Rendering video...",
+        text: `Rendering video: "${intent.cleanPrompt || prompt}"`,
         mediaType: "video",
         modelName: "Copilot Video",
         requestId: reqId,
@@ -406,7 +465,7 @@ async function dispatchCopilotCall(
             updateMessageStatus(chatId, initialMsg.id, {
               videoUrl: pollRes.videoUrl,
               videoStatus: "COMPLETED",
-              text: "Rendered video.",
+              text: intent.displayCaption || `Rendered video for "${intent.cleanPrompt || prompt}"`,
             });
           } else if (pollRes.error) {
             updateMessageStatus(chatId, initialMsg.id, {
@@ -449,6 +508,38 @@ async function dispatchCopilotCall(
       pendingChatId: state.pendingChatId === chatId ? null : state.pendingChatId,
     });
   }
+}
+
+/**
+ * Regenerate or replace the last assistant response in a chat
+ */
+export function regenerateLastResponse(chatId: string) {
+  hydrate();
+  const currentChat = state.chats.find((c) => c.id === chatId);
+  if (!currentChat || currentChat.messages.length === 0) return;
+
+  // Find the last user message
+  const lastUserMsgIndex = currentChat.messages.map((m) => m.role).lastIndexOf("user");
+  if (lastUserMsgIndex === -1) return;
+
+  const lastUserMsg = currentChat.messages[lastUserMsgIndex];
+  // Trim conversation so the previous assistant answer is removed
+  const trimmedMessages = currentChat.messages.slice(0, lastUserMsgIndex + 1);
+
+  setState({
+    chats: state.chats.map((c) =>
+      c.id === chatId
+        ? {
+            ...c,
+            updatedAt: Date.now(),
+            messages: trimmedMessages,
+          }
+        : c,
+    ),
+    pendingChatId: chatId,
+  });
+
+  void dispatchCopilotCall(chatId, lastUserMsg.text, currentChat.model, lastUserMsg.attachmentUrl);
 }
 
 export function createAndSendMessage(

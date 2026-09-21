@@ -29,7 +29,12 @@ function validate(input: VideoAgentConfig): VideoAgentConfig {
   const isLong =
     input.mode === "long" || input.aspect_ratio === "16:9" || Number(input.duration_seconds) > 60;
   const maxDuration = isLong ? 900 : 60;
-  const rawDuration = Math.round(Number(input.duration_seconds ?? (isLong ? 300 : 15)));
+  const rawDuration = Math.round(
+    Number(
+      input.duration_seconds ??
+        (input.duration_minutes ? Number(input.duration_minutes) * 60 : isLong ? 300 : 15),
+    ),
+  );
   const scale = Math.round(Number(input.caption_scale ?? 4));
 
   return {

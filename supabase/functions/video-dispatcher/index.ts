@@ -19,6 +19,53 @@ function captionSizeToken(captionStyle: string): "small" | "medium" | "large" {
   return "small";
 }
 
+/**
+ * GitHub repository dispatch strictly enforces a limit of NO MORE THAN 10
+ * top-level properties in client_payload (POST /repos/{owner}/{repo}/dispatches returns 422 if > 10).
+ * We construct exactly 10 properties tailored to each rendering engine:
+ *
+ * Short-form (mini-editor / render.py):
+ *   video_id, user_id, prompt, negative_prompt, voice_gender, image_style, aspect_ratio, duration_seconds, captions, caption_scale
+ *
+ * Long-form (editor / HyperEditor C++ pipeline):
+ *   video_id, user_id, prompt, negative_prompt, voice_gender, voice_persona, image_style, aspect_ratio, duration_seconds, captions
+ */
+function buildClientPayload(params: {
+  videoId: string;
+  userId: string;
+  prompt: string;
+  negativePrompt?: string | null;
+  voiceGender?: string | null;
+  voicePersona?: string | null;
+  imageStyle?: string | null;
+  aspectRatio?: string | null;
+  durationSeconds: number;
+  captions?: boolean | null;
+  captionStyle?: string | null;
+  captionScale?: number | null;
+  isLong: boolean;
+}): Record<string, string> {
+  const base: Record<string, string> = {
+    video_id: params.videoId,
+    user_id: params.userId,
+    prompt: params.prompt || "",
+    negative_prompt: params.negativePrompt ?? "",
+    voice_gender: params.voiceGender ?? "male",
+    image_style: params.imageStyle ?? "Cinematic 3D",
+    aspect_ratio: params.aspectRatio || (params.isLong ? "16:9" : "9:16"),
+    duration_seconds: String(params.durationSeconds),
+    captions: params.captions ? captionSizeToken(params.captionStyle ?? "") : "false",
+  };
+
+  if (params.isLong) {
+    base.voice_persona = params.voicePersona ?? "Cosmic Documentary";
+  } else {
+    base.caption_scale = String(params.captionScale ?? 4);
+  }
+
+  return base;
+}
+
 // Backend-only / authenticated user access guard
 async function assertAuthorizedCaller(req: Request): Promise<Response | null> {
   const url = new URL(req.url);
@@ -129,14 +176,6 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json();
 
-    // Mode determination
-    const requestedMode: "short" | "long" =
-      body.mode === "long" || body.aspect_ratio === "16:9" || Number(body.duration_seconds) > 60
-        ? "long"
-        : "short";
-
-    const eventType = requestedMode === "long" ? "long_form" : "short_form";
-
     // Scenario A: Direct Dispatch by videoId
     if (body.action === "dispatch" || (body.videoId && !body.prompt)) {
       const videoId = body.videoId || body.video_id;
@@ -151,8 +190,34 @@ Deno.serve(async (req: Request) => {
         throw new Error("GITHUB_PAT secret is not configured in Supabase environment.");
       }
 
-      const durSec = Number(video.duration_seconds) || (requestedMode === "long" ? 300 : 15);
-      const durMin = requestedMode === "long" ? Math.max(1, Math.round(durSec / 60)) : 1;
+      // Robust Short vs Long Form resolution based on mode, aspect_ratio, duration, and persona
+      const isLong =
+        body.mode === "long" ||
+        video.aspect_ratio === "16:9" ||
+        Number(video.duration_seconds) > 60 ||
+        (video.aspect_ratio !== "9:16" && Number(video.duration_seconds) >= 60) ||
+        (typeof video.voice_persona === "string" &&
+          video.voice_persona.toLowerCase().includes("documentary"));
+
+      const requestedMode: "short" | "long" = isLong ? "long" : "short";
+      const eventType = isLong ? "long_form" : "short_form";
+      const durSec = Number(video.duration_seconds) || (isLong ? 300 : 15);
+
+      const clientPayload = buildClientPayload({
+        videoId: video.id,
+        userId: video.user_id,
+        prompt: video.prompt,
+        negativePrompt: video.negative_prompt,
+        voiceGender: video.voice_gender,
+        voicePersona: video.voice_persona,
+        imageStyle: video.image_style,
+        aspectRatio: video.aspect_ratio || (isLong ? "16:9" : "9:16"),
+        durationSeconds: durSec,
+        captions: video.captions,
+        captionStyle: video.caption_style,
+        captionScale: video.caption_scale,
+        isLong,
+      });
 
       const ghRes = await fetch(GITHUB_DISPATCH_URL, {
         method: "POST",
@@ -165,21 +230,7 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({
           event_type: eventType,
-          client_payload: {
-            video_id: video.id,
-            user_id: video.user_id,
-            mode: requestedMode,
-            prompt: video.prompt,
-            negative_prompt: video.negative_prompt,
-            voice_gender: video.voice_gender,
-            voice_persona: video.voice_persona,
-            image_style: video.image_style,
-            aspect_ratio: video.aspect_ratio || (requestedMode === "long" ? "16:9" : "9:16"),
-            duration_seconds: String(durSec),
-            duration_minutes: String(durMin),
-            captions: video.captions ? captionSizeToken(video.caption_style) : "false",
-            caption_scale: String(video.caption_scale ?? 4),
-          },
+          client_payload: clientPayload,
         }),
       });
 
@@ -200,11 +251,9 @@ Deno.serve(async (req: Request) => {
         .from("videos")
         .update({
           status: "processing",
-          step:
-            requestedMode === "long"
-              ? "Initializing Long-Form C++ Engine"
-              : "Initializing Video Engine",
+          step: isLong ? "Initializing Long-Form C++ Engine" : "Initializing Video Engine",
           progress: 5,
+          error: null,
         })
         .eq("id", videoId);
 
@@ -224,17 +273,26 @@ Deno.serve(async (req: Request) => {
       throw new Error("Missing 'prompt' parameter for Video Agent.");
     }
 
+    const isLongB =
+      body.mode === "long" ||
+      body.aspect_ratio === "16:9" ||
+      Number(body.duration_seconds) > 60 ||
+      (Number(body.duration_minutes) && Number(body.duration_minutes) >= 1) ||
+      (typeof body.voice_persona === "string" &&
+        body.voice_persona.toLowerCase().includes("documentary"));
+
+    const requestedModeB: "short" | "long" = isLongB ? "long" : "short";
+    const eventTypeB = isLongB ? "long_form" : "short_form";
+
     const durationSeconds =
-      Number(body.duration_seconds) ||
-      (requestedMode === "long" ? (Number(body.duration_minutes) || 5) * 60 : 15);
+      Number(body.duration_seconds) || (isLongB ? (Number(body.duration_minutes) || 5) * 60 : 15);
 
     const videoConfig = {
       user_id: userId,
       prompt,
       negative_prompt: body.negative_prompt || "blurry, low quality, distorted",
       voice_gender: body.voice_gender || "male",
-      voice_persona:
-        body.voice_persona || (requestedMode === "long" ? "Cosmic Documentary" : "casual"),
+      voice_persona: body.voice_persona || (isLongB ? "Cosmic Documentary" : "casual"),
       voice_speed: Number(body.voice_speed) || 1,
       voice_pitch: Number(body.voice_pitch) || 0,
       image_style: body.image_style || "hyper-realistic",
@@ -242,7 +300,7 @@ Deno.serve(async (req: Request) => {
       captions: body.captions !== undefined ? Boolean(body.captions) : true,
       caption_style: body.caption_style || "medium",
       caption_scale: Math.min(10, Math.max(1, Math.round(Number(body.caption_scale) || 4))),
-      aspect_ratio: body.aspect_ratio || (requestedMode === "long" ? "16:9" : "9:16"),
+      aspect_ratio: body.aspect_ratio || (isLongB ? "16:9" : "9:16"),
       quality: body.quality || "high",
       bitrate: body.bitrate || "standard",
       duration_seconds: durationSeconds,
@@ -269,7 +327,21 @@ Deno.serve(async (req: Request) => {
 
     if (githubPat && body.dispatch !== false) {
       try {
-        const durMin = requestedMode === "long" ? Math.max(1, Math.round(durationSeconds / 60)) : 1;
+        const clientPayload = buildClientPayload({
+          videoId: newVideoId,
+          userId,
+          prompt,
+          negativePrompt: videoConfig.negative_prompt,
+          voiceGender: videoConfig.voice_gender,
+          voicePersona: videoConfig.voice_persona,
+          imageStyle: videoConfig.image_style,
+          aspectRatio: videoConfig.aspect_ratio,
+          durationSeconds,
+          captions: videoConfig.captions,
+          captionStyle: videoConfig.caption_style,
+          captionScale: videoConfig.caption_scale,
+          isLong: isLongB,
+        });
 
         const ghRes = await fetch(GITHUB_DISPATCH_URL, {
           method: "POST",
@@ -281,24 +353,8 @@ Deno.serve(async (req: Request) => {
             "User-Agent": "hyper-copilot-video-dispatcher",
           },
           body: JSON.stringify({
-            event_type: eventType,
-            client_payload: {
-              video_id: newVideoId,
-              user_id: userId,
-              mode: requestedMode,
-              prompt,
-              negative_prompt: videoConfig.negative_prompt,
-              voice_gender: videoConfig.voice_gender,
-              voice_persona: videoConfig.voice_persona,
-              image_style: videoConfig.image_style,
-              aspect_ratio: videoConfig.aspect_ratio,
-              duration_seconds: String(durationSeconds),
-              duration_minutes: String(durMin),
-              captions: videoConfig.captions
-                ? captionSizeToken(videoConfig.caption_style)
-                : "false",
-              caption_scale: String(videoConfig.caption_scale),
-            },
+            event_type: eventTypeB,
+            client_payload: clientPayload,
           }),
         });
 
@@ -313,6 +369,7 @@ Deno.serve(async (req: Request) => {
                   ? "Initializing Long-Form C++ Engine"
                   : "Initializing Video Engine",
               progress: 5,
+              error: null,
             })
             .eq("id", newVideoId);
         } else {

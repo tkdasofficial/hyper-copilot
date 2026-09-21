@@ -503,7 +503,9 @@ Deno.serve(async (req: Request) => {
 
     // 1. Text-To-Audio (Edge TTS)
     if (action === "text-to-audio" || action === "audio") {
-      const text = (body.prompt ?? body.text ?? "").trim();
+      const text = (body.prompt ?? body.text ?? "")
+        .replace(/^\/(audio|tts|voice|speech)\s*/i, "")
+        .trim();
       if (!text) throw new Error("Missing text for audio generation.");
       const result = await callTextToAudio(text, body.voice);
       return new Response(
@@ -522,7 +524,8 @@ Deno.serve(async (req: Request) => {
     if (action === "image-analyse" || action === "analyse" || action === "analysis") {
       const imageUrl = (body.imageUrl ?? body.referenceUrl ?? "").trim();
       if (!imageUrl) throw new Error("Missing image URL for analysis.");
-      const result = await callImageAnalysis(imageUrl, body.prompt);
+      const prompt = (body.prompt ?? "").trim();
+      const result = await callImageAnalysis(imageUrl, prompt);
       return new Response(
         JSON.stringify({
           ok: true,
@@ -536,7 +539,7 @@ Deno.serve(async (req: Request) => {
 
     // 3. Text-To-Image: Pixazo Flux 1 Schnell
     if (action === "text-to-image" || action === "image") {
-      const prompt = (body.prompt ?? "").trim();
+      const prompt = (body.prompt ?? "").replace(/^\/(image|img|draw|art)\s*/i, "").trim();
       if (!prompt) throw new Error("Missing prompt for image generation.");
 
       const result = await callPixazoFluxSchnell(prompt, {
@@ -560,7 +563,7 @@ Deno.serve(async (req: Request) => {
 
     // 4. Video Generation: Pixazo LTX 2.5
     if (action === "image-to-video" || action === "video") {
-      const prompt = (body.prompt ?? "").trim();
+      const prompt = (body.prompt ?? "").replace(/^\/(video|clip)\s*/i, "").trim();
       const imageUrl = (body.imageUrl ?? body.referenceUrl ?? "").trim();
 
       const startResult = await callPixazoStartVideo({
@@ -593,81 +596,82 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 6. Text-To-Text Routing
-    if (action === "text" || action === "chat") {
-      const messages = Array.isArray(body.messages) ? body.messages : [];
-      if (
-        body.prompt &&
-        (!messages.length || messages[messages.length - 1].content !== body.prompt)
-      ) {
-        messages.push({ role: "user", content: body.prompt });
+    // 6. Text-To-Text Routing (Default & Flexible)
+    const messages = Array.isArray(body.messages) ? [...body.messages] : [];
+    const cleanPrompt = (body.prompt ?? "").replace(/^\/(chat|ask)\s*/i, "").trim();
+    if (
+      cleanPrompt &&
+      (!messages.length || messages[messages.length - 1].content !== cleanPrompt)
+    ) {
+      messages.push({ role: "user", content: cleanPrompt });
+    }
+
+    if (!messages.some((m: { role: string }) => m.role === "system")) {
+      messages.unshift({
+        role: "system",
+        content:
+          "You are Copilot, a helpful, intelligent, and versatile AI assistant. Answer user questions directly, thoroughly, and accurately. Format responses cleanly with readable typography and markdown where helpful.",
+      });
+    }
+
+    const tier = modelTier || "flash";
+
+    // 1. Copilot Speed: Cloudflare Worker AI (llama-3.2-1b-instruct)
+    if (tier === "speed" || tier === "copilot-speed") {
+      try {
+        const result = await callCloudflareText("@cf/meta/llama-3.2-1b-instruct", messages);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            type: "text",
+            model: "Cloudflare Worker AI (Llama 3.2 1B)",
+            text: result.text,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      } catch (_cfErr) {
+        const result = await callNvidiaText("meta/llama-3.2-1b-instruct", messages);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            type: "text",
+            model: "Llama 3.2 1B",
+            text: result.text,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
+    }
 
-      if (!messages.some((m: { role: string }) => m.role === "system")) {
-        messages.unshift({
-          role: "system",
-          content:
-            "You are Copilot, a fast, knowledgeable, and helpful AI assistant. Provide concise, clean, well-formatted, and direct answers without unnecessary fluff.",
-        });
+    // 2. Copilot Flash: Llama-3.3-70B-Instruct
+    if (tier === "flash" || tier === "copilot-flash") {
+      try {
+        const result = await callNvidiaText("meta/llama-3.3-70b-instruct", messages);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            type: "text",
+            model: "Llama 3.3 70B Instruct",
+            text: result.text,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      } catch (_err) {
+        const result = await callCloudflareText("@cf/meta/llama-3.2-1b-instruct", messages);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            type: "text",
+            model: "Llama 3.3 70B Instruct",
+            text: result.text,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
+    }
 
-      const tier = modelTier || "flash";
-
-      // 1. Copilot Speed: Cloudflare Worker AI (llama-3.2-1b-instruct)
-      if (tier === "speed" || tier === "copilot-speed") {
-        try {
-          const result = await callCloudflareText("@cf/meta/llama-3.2-1b-instruct", messages);
-          return new Response(
-            JSON.stringify({
-              ok: true,
-              type: "text",
-              model: "Cloudflare Worker AI (Llama 3.2 1B)",
-              text: result.text,
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        } catch (_cfErr) {
-          const result = await callNvidiaText("meta/llama-3.2-1b-instruct", messages);
-          return new Response(
-            JSON.stringify({
-              ok: true,
-              type: "text",
-              model: "Llama 3.2 1B",
-              text: result.text,
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-      }
-
-      // 2. Copilot Flash: Llama-3.3-70B-Instruct
-      if (tier === "flash" || tier === "copilot-flash") {
-        try {
-          const result = await callNvidiaText("meta/llama-3.3-70b-instruct", messages);
-          return new Response(
-            JSON.stringify({
-              ok: true,
-              type: "text",
-              model: "Llama 3.3 70B Instruct",
-              text: result.text,
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        } catch (_err) {
-          const result = await callCloudflareText("@cf/meta/llama-3.2-1b-instruct", messages);
-          return new Response(
-            JSON.stringify({
-              ok: true,
-              type: "text",
-              model: "Llama 3.3 70B Instruct",
-              text: result.text,
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-      }
-
-      // 3. Copilot Heavy: Nvidia (nemotron-3-ultra-550b-a55b)
+    // 3. Copilot Heavy: Nvidia Nemotron with resilient fallback
+    try {
       const result = await callNvidiaText("nvidia/nemotron-3-ultra-550b-a55b", messages);
       return new Response(
         JSON.stringify({
@@ -678,9 +682,31 @@ Deno.serve(async (req: Request) => {
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    } catch (_heavyErr) {
+      try {
+        const result = await callNvidiaText("meta/llama-3.3-70b-instruct", messages);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            type: "text",
+            model: "Llama 3.3 70B Instruct",
+            text: result.text,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      } catch (_fallErr) {
+        const result = await callCloudflareText("@cf/meta/llama-3.2-1b-instruct", messages);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            type: "text",
+            model: "Llama 3.2 1B",
+            text: result.text,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
-
-    throw new Error(`Unknown action: '${action}'.`);
   } catch (err) {
     return new Response(
       JSON.stringify({

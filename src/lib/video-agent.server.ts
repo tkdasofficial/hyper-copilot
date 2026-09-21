@@ -19,20 +19,22 @@ import type { Database } from "@/integrations/supabase/types";
 
 export type VideoRenderConfig = {
   prompt: string;
-  negative_prompt: string;
-  voice_gender: string;
-  voice_persona: string;
-  voice_speed: number;
-  voice_pitch: number;
-  image_style: string;
-  motion_template: string;
-  captions: boolean;
-  caption_style: string;
-  caption_scale: number;
-  aspect_ratio: string;
-  quality: string;
-  bitrate: string;
-  duration_seconds: number;
+  negative_prompt?: string;
+  voice_gender?: string;
+  voice_persona?: string;
+  voice_speed?: number;
+  voice_pitch?: number;
+  image_style?: string;
+  motion_template?: string;
+  captions?: boolean;
+  caption_style?: string;
+  caption_scale?: number;
+  aspect_ratio?: string;
+  quality?: string;
+  bitrate?: string;
+  duration_seconds?: number;
+  duration_minutes?: number;
+  mode?: string;
 };
 
 type Client = SupabaseClient<Database>;
@@ -50,6 +52,7 @@ const RENDER_STEP_DISPATCHING = "dispatching";
 async function invokeRenderDispatch(
   admin: Client,
   videoId: string,
+  mode?: "short" | "long",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { data: runner } = await admin
     .from("job_runner")
@@ -68,7 +71,7 @@ async function invokeRenderDispatch(
       const res = await admin.functions.invoke<{ ok?: boolean; error?: string }>(
         "video-dispatcher",
         {
-          body: { action: "dispatch", videoId },
+          body: { action: "dispatch", videoId, mode },
           headers: { "x-worker-secret": workerSecret },
         },
       );
@@ -80,12 +83,94 @@ async function invokeRenderDispatch(
 
     if (invokeErr || !payload || payload.ok !== true) {
       const fb = await admin.functions.invoke<{ ok?: boolean; error?: string }>("video-agent", {
-        body: { action: "dispatch", videoId },
+        body: { action: "dispatch", videoId, mode },
         headers: { "x-worker-secret": workerSecret },
       });
       if (fb.data && fb.data.ok === true) {
+        await admin.from("videos").update({ error: null }).eq("id", videoId);
         return { ok: true };
       }
+
+      // If edge functions fail, perform direct GitHub dispatch if GITHUB_PAT is configured
+      const githubPat = process.env.GITHUB_PAT?.trim();
+      if (githubPat) {
+        try {
+          const { data: v } = await admin
+            .from("videos")
+            .select("*")
+            .eq("id", videoId)
+            .maybeSingle();
+          if (v) {
+            const isLong =
+              mode === "long" ||
+              v.aspect_ratio === "16:9" ||
+              Number(v.duration_seconds) > 60 ||
+              (v.aspect_ratio !== "9:16" && Number(v.duration_seconds) >= 60) ||
+              (typeof v.voice_persona === "string" &&
+                v.voice_persona.toLowerCase().includes("documentary"));
+            const eventType = isLong ? "long_form" : "short_form";
+            const captionSize = (v.caption_style ?? "").toLowerCase().includes("large")
+              ? "large"
+              : (v.caption_style ?? "").toLowerCase().includes("medium")
+                ? "medium"
+                : "small";
+
+            const directPayload: Record<string, string> = {
+              video_id: v.id,
+              user_id: v.user_id,
+              prompt: v.prompt || "",
+              negative_prompt: v.negative_prompt ?? "",
+              voice_gender: v.voice_gender ?? "male",
+              image_style: v.image_style ?? "Cinematic 3D",
+              aspect_ratio: v.aspect_ratio || (isLong ? "16:9" : "9:16"),
+              duration_seconds: String(v.duration_seconds || (isLong ? 300 : 15)),
+              captions: v.captions ? captionSize : "false",
+            };
+            if (isLong) {
+              directPayload.voice_persona = v.voice_persona ?? "Cosmic Documentary";
+            } else {
+              directPayload.caption_scale = String(v.caption_scale ?? 4);
+            }
+
+            const ghRes = await fetch(
+              "https://api.github.com/repos/TKDasOfficial/video-agent/dispatches",
+              {
+                method: "POST",
+                headers: {
+                  Accept: "application/vnd.github+json",
+                  Authorization: `Bearer ${githubPat}`,
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "Content-Type": "application/json",
+                  "User-Agent": "hyper-copilot-video-server-direct",
+                },
+                body: JSON.stringify({
+                  event_type: eventType,
+                  client_payload: directPayload,
+                }),
+              },
+            );
+
+            if (ghRes.ok) {
+              const stepDesc = isLong
+                ? "Initializing Long-Form C++ Engine"
+                : "Initializing Video Engine";
+              await admin
+                .from("videos")
+                .update({
+                  status: "processing",
+                  step: stepDesc,
+                  progress: 5,
+                  error: null,
+                })
+                .eq("id", videoId);
+              return { ok: true };
+            }
+          }
+        } catch {
+          // Fall through to error reporting below
+        }
+      }
+
       return {
         ok: false,
         error:
@@ -136,11 +221,36 @@ export async function createVideoRequest(
     throw new Error("You are out of render credits. Upgrade your plan to keep creating videos.");
   }
 
-  const { data: row, error } = await supabase
-    .from("videos")
-    .insert({ ...data, user_id: userId, status: "pending", step: RENDER_STEP_QUEUED, progress: 0 })
-    .select("id")
-    .single();
+  // Calculate duration_seconds safely if duration_minutes was provided
+  const durationSeconds =
+    Number(data.duration_seconds) ||
+    (data.duration_minutes ? Math.round(Number(data.duration_minutes) * 60) : 15);
+
+  // Explicitly construct payload with ONLY existing database columns on public.videos
+  // to prevent PostgREST PGRST204 ("Could not find column in schema cache") errors
+  const videoRow = {
+    user_id: userId,
+    prompt: data.prompt,
+    negative_prompt: data.negative_prompt ?? "",
+    voice_gender: data.voice_gender ?? "male",
+    voice_persona: data.voice_persona ?? "Cinematic Narrator",
+    voice_speed: Number(data.voice_speed) || 110,
+    voice_pitch: Number(data.voice_pitch) || 52,
+    image_style: data.image_style ?? "Cinematic 3D",
+    motion_template: data.motion_template ?? "Auto Zoom-In",
+    captions: Boolean(data.captions),
+    caption_style: data.caption_style ?? "Neon Glow",
+    caption_scale: Number(data.caption_scale) || 4,
+    aspect_ratio: data.aspect_ratio ?? "9:16",
+    quality: data.quality ?? "1080p",
+    bitrate: data.bitrate ?? "High",
+    duration_seconds: durationSeconds,
+    status: "pending" as const,
+    step: RENDER_STEP_QUEUED,
+    progress: 0,
+  };
+
+  const { data: row, error } = await supabase.from("videos").insert(videoRow).select("id").single();
 
   if (error || !row) throw new Error(error?.message ?? "Could not create the video record");
   return row.id as string;
@@ -211,7 +321,14 @@ export async function dispatchVideoRender(
   // b. Hand the render to the Supabase Edge Function. It owns the Video Engine
   //    access token (Supabase secret) and performs the repository_dispatch; the
   //    app only learns whether the hand-off succeeded.
-  const handoff = await invokeRenderDispatch(admin, videoId);
+  const isLong =
+    video.aspect_ratio === "16:9" ||
+    Number(video.duration_seconds) > 60 ||
+    (video.aspect_ratio !== "9:16" && Number(video.duration_seconds) >= 60) ||
+    (typeof video.voice_persona === "string" &&
+      video.voice_persona.toLowerCase().includes("documentary"));
+
+  const handoff = await invokeRenderDispatch(admin, videoId, isLong ? "long" : "short");
   if (!handoff.ok) {
     await refund();
     return fail(handoff.error);
@@ -219,7 +336,10 @@ export async function dispatchVideoRender(
 
   await admin
     .from("videos")
-    .update({ status: "processing", step: "Initializing Video Engine" })
+    .update({
+      status: "processing",
+      step: isLong ? "Initializing Long-Form C++ Engine" : "Initializing Video Engine",
+    })
     .eq("id", videoId);
 
   return "dispatched";
