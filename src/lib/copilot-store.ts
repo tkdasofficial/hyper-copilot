@@ -1,4 +1,4 @@
-import { executeCopilotApi, pollVideoStatus } from "@/lib/copilot-api";
+import { executeCopilotApi, pollVideoStatus, type CopilotActionType } from "@/lib/copilot-api";
 
 export type CopilotRole = "user" | "assistant";
 
@@ -9,7 +9,8 @@ export type CopilotMessage = {
   at: number;
   imageUrl?: string;
   videoUrl?: string;
-  mediaType?: "text" | "image" | "video";
+  audioUrl?: string;
+  mediaType?: "text" | "image" | "video" | "audio";
   modelName?: string;
   error?: string;
   attachmentUrl?: string;
@@ -24,32 +25,27 @@ export type CopilotConversation = {
   createdAt: number;
   updatedAt: number;
   messages: CopilotMessage[];
+  archivedToDrive?: boolean;
+  isCachedLocally?: boolean;
+  syncStatus?: "synced" | "syncing" | "idle" | "error";
+  lastSyncedAt?: number;
 };
 
 export const COPILOT_MODELS = [
   {
-    id: "nvidia-nemotron",
-    label: "Nvidia Nemotron 3 Ultra",
-    detail: "Text-To-Text (550b)",
-    category: "text",
+    id: "copilot-speed",
+    label: "Copilot Speed",
+    detail: "Fast everyday conversations",
   },
   {
-    id: "pixazo-flux",
-    label: "Flux 1 Schnell",
-    detail: "Text-To-Image (FREE)",
-    category: "image",
+    id: "copilot-flash",
+    label: "Copilot Flash",
+    detail: "Multimodal text, image & audio",
   },
   {
-    id: "pixazo-inpainting",
-    label: "SD Inpainting",
-    detail: "Image-To-Image (FREE)",
-    category: "image-to-image",
-  },
-  {
-    id: "pixazo-ltx",
-    label: "LTX 2.5",
-    detail: "Image-To-Video (FREE)",
-    category: "video",
+    id: "copilot-heavy",
+    label: "Copilot Heavy",
+    detail: "Advanced reasoning & video",
   },
 ];
 
@@ -118,19 +114,29 @@ function makeId() {
 
 function titleFrom(prompt: string) {
   const clean = prompt.replace(/\s+/g, " ").trim();
-  return clean.length > 48 ? `${clean.slice(0, 48)}…` : clean || "New chat";
+  return clean.length > 44 ? `${clean.slice(0, 44)}…` : clean || "New chat";
 }
 
-function normalizeModel(modelId?: string): string {
-  if (!modelId) return "nvidia-nemotron";
-  if (modelId === "speed" || modelId === "flash" || modelId === "heavy") {
-    return "nvidia-nemotron";
+export function normalizeModel(modelId?: string): string {
+  if (!modelId) return "copilot-flash";
+  if (modelId === "speed" || modelId === "copilot-speed") return "copilot-speed";
+  if (modelId === "flash" || modelId === "copilot-flash") return "copilot-flash";
+  if (
+    modelId === "heavy" ||
+    modelId === "copilot-heavy" ||
+    modelId === "nvidia-nemotron" ||
+    modelId === "pixazo-ltx"
+  ) {
+    return "copilot-heavy";
+  }
+  if (modelId === "pixazo-flux" || modelId === "pixazo-inpainting") {
+    return "copilot-flash";
   }
   const found = COPILOT_MODELS.find((m) => m.id === modelId);
-  return found ? found.id : "nvidia-nemotron";
+  return found ? found.id : "copilot-flash";
 }
 
-export function createChat(model: string = "nvidia-nemotron"): string {
+export function createChat(model: string = "copilot-flash"): string {
   hydrate();
   const normalized = normalizeModel(model);
   const now = Date.now();
@@ -154,6 +160,99 @@ export function deleteChat(id: string) {
 export function clearChats() {
   hydrate();
   setState({ chats: [] });
+}
+
+/**
+ * Rehydrate a chat session with messages fetched dynamically from Google Drive
+ */
+export function rehydrateChat(
+  chatId: string,
+  messages: CopilotMessage[],
+  meta?: { title?: string; model?: string; updatedAt?: number },
+) {
+  hydrate();
+  const existing = state.chats.find((c) => c.id === chatId);
+  if (existing) {
+    setState({
+      chats: state.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              messages,
+              title: meta?.title || c.title,
+              model: meta?.model || c.model,
+              updatedAt: meta?.updatedAt || c.updatedAt,
+              isCachedLocally: true,
+              archivedToDrive: true,
+              syncStatus: "synced",
+              lastSyncedAt: Date.now(),
+            }
+          : c,
+      ),
+    });
+  } else {
+    // Session wasn't in state, add it
+    const now = meta?.updatedAt || Date.now();
+    const newChat: CopilotConversation = {
+      id: chatId,
+      title: meta?.title || "Archived chat",
+      model: normalizeModel(meta?.model),
+      createdAt: now,
+      updatedAt: now,
+      messages,
+      isCachedLocally: true,
+      archivedToDrive: true,
+      syncStatus: "synced",
+      lastSyncedAt: Date.now(),
+    };
+    setState({ chats: [newChat, ...state.chats] });
+  }
+}
+
+/**
+ * Purge local messages cache for an archived session (keeps header/metadata)
+ */
+export function purgeChatCache(chatId: string) {
+  hydrate();
+  setState({
+    chats: state.chats.map((c) =>
+      c.id === chatId
+        ? {
+            ...c,
+            messages: [], // Clear heavy message array from local storage
+            isCachedLocally: false,
+            archivedToDrive: true,
+            syncStatus: "synced",
+          }
+        : c,
+    ),
+  });
+}
+
+/**
+ * Update sync status for a chat session
+ */
+export function setChatSyncState(
+  chatId: string,
+  syncStatus: "synced" | "syncing" | "idle" | "error",
+  lastSyncedAt?: number,
+) {
+  hydrate();
+  setState(
+    {
+      chats: state.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              syncStatus,
+              lastSyncedAt: lastSyncedAt ?? c.lastSyncedAt,
+              archivedToDrive: syncStatus === "synced" ? true : c.archivedToDrive,
+            }
+          : c,
+      ),
+    },
+    false,
+  );
 }
 
 function appendAssistantMessage(chatId: string, message: CopilotMessage) {
@@ -192,26 +291,55 @@ async function dispatchCopilotCall(
 ) {
   const normalized = normalizeModel(model);
 
-  // Determine the appropriate API action
-  let action: "text" | "text-to-image" | "image-to-image" | "image-to-video" = "text";
-  if (normalized === "pixazo-flux") {
-    action = "text-to-image";
-  } else if (normalized === "pixazo-inpainting") {
-    action = "image-to-image";
-  } else if (normalized === "pixazo-ltx") {
-    action = "image-to-video";
-  } else if (attachmentUrl && /video|animate|motion|cinematic|moving/i.test(prompt)) {
-    action = "image-to-video";
-  } else if (attachmentUrl && /edit|inpaint|modify|change|restyle|recolor/i.test(prompt)) {
-    action = "image-to-image";
-  } else if (
-    /^\/image\b|generate image|draw|render image|picture of/i.test(prompt) &&
-    !attachmentUrl
-  ) {
-    action = "text-to-image";
+  let action: CopilotActionType = "text";
+  let modelTier: "speed" | "flash" | "heavy" = "flash";
+
+  if (normalized === "copilot-speed") {
+    action = "text";
+    modelTier = "speed";
+  } else if (normalized === "copilot-flash") {
+    modelTier = "flash";
+    if (attachmentUrl) {
+      action = "image-analyse";
+    } else if (
+      /^\/audio\b|generate audio|text to audio|text to speech|speak\b|voiceover|read aloud/i.test(
+        prompt,
+      )
+    ) {
+      action = "text-to-audio";
+    } else if (
+      /^\/image\b|generate image|draw\b|render image|picture of\b|create an image/i.test(prompt)
+    ) {
+      action = "text-to-image";
+    } else {
+      action = "text";
+    }
+  } else {
+    modelTier = "heavy";
+    if (
+      /^\/video\b|generate video|animate\b|motion\b|make a video|render video|create video/i.test(
+        prompt,
+      ) ||
+      (attachmentUrl && /video|animate|motion|cinematic/i.test(prompt))
+    ) {
+      action = "image-to-video";
+    } else if (
+      /^\/audio\b|generate audio|text to audio|text to speech|speak\b|voiceover|read aloud/i.test(
+        prompt,
+      )
+    ) {
+      action = "text-to-audio";
+    } else if (attachmentUrl) {
+      action = "image-analyse";
+    } else if (
+      /^\/image\b|generate image|draw\b|render image|picture of\b|create an image/i.test(prompt)
+    ) {
+      action = "text-to-image";
+    } else {
+      action = "text";
+    }
   }
 
-  // Conversation history for context if text
   const currentChat = state.chats.find((c) => c.id === chatId);
   const historyMessages = (currentChat?.messages ?? [])
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -220,6 +348,7 @@ async function dispatchCopilotCall(
   try {
     const result = await executeCopilotApi({
       action,
+      modelTier,
       prompt,
       messages: historyMessages,
       imageUrl: attachmentUrl,
@@ -229,18 +358,27 @@ async function dispatchCopilotCall(
       throw new Error(result.error || "Copilot generation request failed.");
     }
 
-    if (result.type === "image" && result.imageUrl) {
+    if (result.type === "audio" && result.audioUrl) {
+      const assistantMsg: CopilotMessage = {
+        id: makeId(),
+        role: "assistant",
+        text: prompt
+          ? `Generated audio for: "${prompt.replace(/^\/(audio|tts)\s*/i, "")}"`
+          : "Generated audio.",
+        audioUrl: result.audioUrl,
+        mediaType: "audio",
+        modelName: "Copilot Voice",
+        at: Date.now(),
+      };
+      appendAssistantMessage(chatId, assistantMsg);
+    } else if (result.type === "image" && result.imageUrl) {
       const assistantMsg: CopilotMessage = {
         id: makeId(),
         role: "assistant",
         text: prompt,
         imageUrl: result.imageUrl,
         mediaType: "image",
-        modelName:
-          result.model ||
-          (action === "image-to-image"
-            ? "Pixazo Stable Diffusion Inpainting (Free)"
-            : "Pixazo Flux 1 Schnell (Free)"),
+        modelName: "Copilot Image",
         at: Date.now(),
       };
       appendAssistantMessage(chatId, assistantMsg);
@@ -249,9 +387,11 @@ async function dispatchCopilotCall(
       const initialMsg: CopilotMessage = {
         id: makeId(),
         role: "assistant",
-        text: prompt ? `Rendering video: "${prompt}"` : "Rendering video...",
+        text: prompt
+          ? `Rendering video: "${prompt.replace(/^\/video\s*/i, "")}"`
+          : "Rendering video...",
         mediaType: "video",
-        modelName: "Pixazo LTX 2.5 (Free)",
+        modelName: "Copilot Video",
         requestId: reqId,
         videoStatus: result.status || "PROCESSING",
         at: Date.now(),
@@ -259,7 +399,6 @@ async function dispatchCopilotCall(
       appendAssistantMessage(chatId, initialMsg);
 
       if (reqId) {
-        // Poll for video generation completion
         void pollVideoStatus(reqId, (status) => {
           updateMessageStatus(chatId, initialMsg.id, { videoStatus: status });
         }).then((pollRes) => {
@@ -267,26 +406,30 @@ async function dispatchCopilotCall(
             updateMessageStatus(chatId, initialMsg.id, {
               videoUrl: pollRes.videoUrl,
               videoStatus: "COMPLETED",
-              text: `Rendered with Pixazo LTX 2.5 (Free)`,
+              text: "Rendered video.",
             });
           } else if (pollRes.error) {
             updateMessageStatus(chatId, initialMsg.id, {
               videoStatus: "FAILED",
               error: pollRes.error,
-              text: `Video generation error: ${pollRes.error}`,
+              text: `Video error: ${pollRes.error}`,
             });
           }
         });
       }
     } else {
-      // Text response from Nvidia Nemotron 3 Ultra
       const replyText = result.text || "No response received.";
       const assistantMsg: CopilotMessage = {
         id: makeId(),
         role: "assistant",
         text: replyText,
         mediaType: "text",
-        modelName: result.model || "Nvidia Nemotron 3 Ultra (550b)",
+        modelName:
+          modelTier === "speed"
+            ? "Copilot Speed"
+            : modelTier === "flash"
+              ? "Copilot Flash"
+              : "Copilot Heavy",
         at: Date.now(),
       };
       appendAssistantMessage(chatId, assistantMsg);
@@ -310,7 +453,7 @@ async function dispatchCopilotCall(
 
 export function createAndSendMessage(
   prompt: string,
-  model: string = "nvidia-nemotron",
+  model: string = "copilot-flash",
   attachmentUrl?: string,
 ): string {
   hydrate();
@@ -345,7 +488,7 @@ export function createAndSendMessage(
 export function sendMessage(
   chatId: string,
   prompt: string,
-  model: string = "nvidia-nemotron",
+  model: string = "copilot-flash",
   attachmentUrl?: string,
 ) {
   hydrate();

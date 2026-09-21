@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, Play } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  Play,
+  Sparkles,
+  Film,
+  Clapperboard,
+  Layers,
+  Sliders,
+  Volume2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { StudioLayout } from "@/components/hyper/StudioLayout";
@@ -33,14 +43,15 @@ export const Route = createFileRoute("/video-agent")({
   head: () =>
     pageHead({
       path: "/video-agent",
-      title: "Video Agent \u2014 Nature & Cosmic Story Videos | Hyper Copilot",
+      title: "Video Agent — Dual-Engine AI Video Pipeline | Hyper Copilot",
       description:
-        "Turn one idea into a narrated nature or cosmic story video: people-free visuals, documentary voices, motion presets, captions and a live build log.",
-      ogTitle: "Video Agent \u2014 Nature & Cosmic AI Story Videos",
+        "Dual-engine video studio: fast short-form 9:16 reels with mini-editor, or 16:9 full HD long-form documentaries powered by the native C++ headless editor.",
+      ogTitle: "Video Agent — Dual-Engine Short & Long-Form Video Studio",
       keywords: [
         "AI nature video generator",
         "cosmic story video AI",
-        "space documentary AI video",
+        "long-form documentary AI video",
+        "C++ headless video editor",
         "AI narrated nature shorts",
         "people free AI video",
       ],
@@ -56,6 +67,7 @@ const voicePresets = [
   "Deep Storyteller",
   "Awe & Wonder",
 ] as const;
+
 const artStyles = ART_STYLES;
 const imageStyles = IMAGE_STYLES;
 const motionTemplates = [
@@ -64,13 +76,16 @@ const motionTemplates = [
   "Dynamic Keyframe",
   "Fade Transitions",
 ] as const;
+
 const ratios = ["9:16", "16:9"] as const;
 const ratioLabels: Record<(typeof ratios)[number], string> = {
   "9:16": "Shorts / Reels",
-  "16:9": "Landscape",
+  "16:9": "Landscape / Cinema",
 };
+
 const qualities = ["720p", "1080p"] as const;
 const bitrates = ["Standard", "High"] as const;
+
 const guidanceTags = [
   "8K nature detail",
   "deep space",
@@ -82,9 +97,7 @@ const guidanceTags = [
 ] as const;
 
 /**
- * Story themes for the humanless nature / cosmic storytelling flow the render
- * pipeline is tuned for: picking one primes the script idea, visual style,
- * motion and guidance tags in a single tap.
+ * Story themes for humanless nature / cosmic storytelling.
  */
 const storyThemes = [
   {
@@ -123,18 +136,17 @@ const storyThemes = [
 
 type StoryTheme = (typeof storyThemes)[number];
 
-const mockPrompt = "";
-const mockNegative = "";
-
 type LogLine = { time: string; text: string; tone?: "ok" | "warn" | "err" };
 
 function Console({ lines }: { lines: LogLine[] }) {
   const endRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [lines.length]);
+
   return (
-    <div className="max-h-52 overflow-y-auto rounded-xl bg-surface-2/40 p-3 font-mono text-[11.5px] leading-relaxed">
+    <div className="max-h-56 overflow-y-auto rounded-xl bg-surface-2/40 p-3 font-mono text-[11.5px] leading-relaxed">
       {lines.map((l, i) => (
         <p
           key={i}
@@ -198,12 +210,14 @@ function RatioBlocksWithLabels<T extends string>({
   value,
   onChange,
   labels,
+  disabledOption,
 }: {
   label?: string;
   options: readonly T[];
   value: T;
   onChange: (v: T) => void;
   labels: Record<T, string>;
+  disabledOption?: T;
 }) {
   return (
     <div>
@@ -213,17 +227,21 @@ function RatioBlocksWithLabels<T extends string>({
       <div className="grid grid-cols-2 gap-2">
         {options.map((o) => {
           const active = value === o;
+          const isDisabled = disabledOption === o;
           return (
             <button
               key={o}
               type="button"
+              disabled={isDisabled}
               aria-pressed={active}
-              onClick={() => onChange(o)}
+              onClick={() => !isDisabled && onChange(o)}
               className={cn(
                 "flex flex-col items-center gap-1 rounded-2xl border px-3 py-3 transition-colors",
-                active
-                  ? "border-foreground/25 bg-surface-2 text-foreground"
-                  : "border-border bg-background text-muted-foreground hover:border-border-strong hover:bg-surface-2/60",
+                isDisabled
+                  ? "cursor-not-allowed opacity-40 border-border bg-background"
+                  : active
+                    ? "border-foreground/25 bg-surface-2 text-foreground shadow-sm"
+                    : "border-border bg-background text-muted-foreground hover:border-border-strong hover:bg-surface-2/60",
               )}
             >
               <span className="text-[13px] font-bold">{o}</span>
@@ -237,33 +255,39 @@ function RatioBlocksWithLabels<T extends string>({
 }
 
 function VideoAgent() {
-  const [prompt, setPrompt] = useState(mockPrompt);
-  const [negative, setNegative] = useState(mockNegative);
-  const [tags, setTags] = useState<string[]>([...storyThemes[0].tags]);
-  const [duration, setDuration] = useState(15);
-  const [theme, setTheme] = useState<StoryTheme["id"]>(storyThemes[0].id);
+  // Mode state: short vs long
+  const [mode, setMode] = useState<"short" | "long">("short");
 
+  const [prompt, setPrompt] = useState("");
+  const [negative, setNegative] = useState("");
+  const [tags, setTags] = useState<string[]>([...storyThemes[0].tags]);
+
+  // Duration: seconds for short-form (1-60s), minutes for long-form (1-15 min)
+  const [duration, setDuration] = useState(15);
+  const [durationMinutes, setDurationMinutes] = useState(5);
+
+  const [theme, setTheme] = useState<StoryTheme["id"]>(storyThemes[0].id);
   const [gender, setGender] = useState<(typeof genders)[number]>("Male");
   const [preset, setPreset] = useState<(typeof voicePresets)[number]>("Cosmic Documentary");
   const [speed, setSpeed] = useState(110);
   const [pitch, setPitch] = useState(52);
-
   const [artStyle, setArtStyle] = useState<(typeof artStyles)[number]>(ART_STYLES[0]);
   const [imageStyle, setImageStyle] = useState<(typeof imageStyles)[number]>(IMAGE_STYLES[0]);
   const [motion, setMotion] = useState<(typeof motionTemplates)[number]>("Auto Zoom-In");
-
   const [captions, setCaptions] = useState(true);
   const [captionTemplate, setCaptionTemplate] = useState<(typeof CAPTION_TEMPLATES)[number]>(
     CAPTION_TEMPLATES[0],
   );
   const [captionScale, setCaptionScale] = useState(4);
 
+  // Aspect ratio: automatically 9:16 for short, 16:9 for long
   const [ratio, setRatio] = useState<(typeof ratios)[number]>("9:16");
   const [quality, setQuality] = useState<(typeof qualities)[number]>("1080p");
   const [bitrate, setBitrate] = useState<(typeof bitrates)[number]>("High");
 
   const [busy, setBusy] = useState(false);
   const [clipUrl, setClipUrl] = useState<string | null>(null);
+  const [driveUrl, setDriveUrl] = useState<string | null>(null);
   const [lines, setLines] = useState<LogLine[]>([]);
   const queryClient = useQueryClient();
 
@@ -277,8 +301,20 @@ function VideoAgent() {
     null,
   );
   const seenLogs = useRef(0);
+
   const start = useServerFn(startVideoRender);
   const resolvePlaybackUrl = useServerFn(getVideoPlaybackUrl);
+
+  // Content Mode Selector handler: auto-adjusts aspect ratio and defaults
+  const handleModeChange = (nextMode: "short" | "long") => {
+    setMode(nextMode);
+    if (nextMode === "short") {
+      setRatio("9:16");
+      if (duration > 60) setDuration(15);
+    } else {
+      setRatio("16:9");
+    }
+  };
 
   // Follow the render row the render pipeline writes progress into.
   useEffect(() => {
@@ -287,7 +323,13 @@ function VideoAgent() {
 
     const apply = (row: Record<string, unknown> | null) => {
       if (!row) return;
-      const rowLogs = Array.isArray(row["logs"]) ? (row["logs"] as unknown[]) : [];
+
+      const rowLogs = Array.isArray(row["logs"])
+        ? (row["logs"] as unknown[])
+        : typeof row["logs"] === "string" && row["logs"]
+          ? [row["logs"]]
+          : [];
+
       if (rowLogs.length > seenLogs.current) {
         const fresh = rowLogs.slice(seenLogs.current);
         seenLogs.current = rowLogs.length;
@@ -304,16 +346,17 @@ function VideoAgent() {
         log(`${row["step"]}…`);
       }
 
-      const status = String(row["status"] ?? "");
+      const rowStatus = String(row["status"] ?? "");
       if (
-        status === "pending" ||
-        status === "processing" ||
-        status === "completed" ||
-        status === "failed"
+        rowStatus === "pending" ||
+        rowStatus === "processing" ||
+        rowStatus === "completed" ||
+        rowStatus === "failed"
       ) {
-        setStatus(status);
+        setStatus(rowStatus);
       }
-      if (status === "completed") {
+
+      if (rowStatus === "completed") {
         const raw = typeof row["video_url"] === "string" ? row["video_url"] : null;
         if (raw && /^https?:\/\//i.test(raw)) {
           setClipUrl(raw);
@@ -322,12 +365,32 @@ function VideoAgent() {
             setClipUrl(url),
           );
         }
-        log("render complete", "ok");
+
+        // Detect Google Drive export link
+        if (typeof row["drive_url"] === "string" && row["drive_url"]) {
+          setDriveUrl(row["drive_url"]);
+        } else {
+          for (const entry of rowLogs) {
+            const text =
+              typeof entry === "string"
+                ? entry
+                : typeof entry === "object" && entry && "text" in entry
+                  ? String((entry as { text: unknown }).text)
+                  : JSON.stringify(entry);
+            const match = text.match(/https:\/\/drive\.google\.com\/[^\s"')]+/);
+            if (match) {
+              setDriveUrl(match[0]);
+              break;
+            }
+          }
+        }
+
+        log("Render completed successfully!", "ok");
         setBusy(false);
         setVideoId(null);
         void queryClient.invalidateQueries({ queryKey: ["generations"] });
         toast.success("Video ready");
-      } else if (status === "failed") {
+      } else if (rowStatus === "failed") {
         const msg =
           typeof row["error"] === "string" && row["error"] ? row["error"] : "Render failed";
         log(msg, "err");
@@ -346,7 +409,7 @@ function VideoAgent() {
       )
       .subscribe();
 
-    // Safety net: Realtime can miss an update while the tab is backgrounded.
+    // Safety net: Realtime polling backup
     const poll = window.setInterval(() => {
       void supabase
         .from("videos")
@@ -354,7 +417,7 @@ function VideoAgent() {
         .eq("id", videoId)
         .maybeSingle()
         .then(({ data }) => apply(data as Record<string, unknown> | null));
-    }, 6000);
+    }, 5000);
 
     return () => {
       window.clearInterval(poll);
@@ -372,18 +435,47 @@ function VideoAgent() {
 
   const activeTheme = storyThemes.find((t) => t.id === theme) ?? storyThemes[0];
 
+  // Flexible duration calculation text helper
+  const getFlexibleDurationWindow = (mins: number) => {
+    if (mins <= 1) {
+      return {
+        summary: "1.0 to 1.5 min output window",
+        range: "1.0 – 1.5 min (60s – 90s)",
+      };
+    }
+    return {
+      summary: `${mins - 1}.0 to ${mins + 1}.0 min output window`,
+      range: `${mins - 1}.0 – ${mins + 1}.0 min (${(mins - 1) * 60}s – ${(mins + 1) * 60}s)`,
+    };
+  };
+
   const render = async () => {
     if (!prompt.trim()) {
       toast.error("Write the story you want the agent to build first.");
       return;
     }
+
     setBusy(true);
     setClipUrl(null);
+    setDriveUrl(null);
     setStatus("pending");
     setLines([]);
     seenLogs.current = 0;
+
+    const calculatedDurationSec = mode === "long" ? durationMinutes * 60 : duration;
+
     try {
-      log(`$ agent render --duration ${duration}s --ratio ${ratio} --quality ${quality}`);
+      log(`$ agent render --mode ${mode} --canvas ${ratio} --target-res ${quality}`);
+      if (mode === "long") {
+        log(`engine: editor/ (C++ Headless Engine) · 1080p target @ 60 FPS (30 FPS fallback)`);
+        log(
+          `runtime: target ${durationMinutes} min · window: ${getFlexibleDurationWindow(durationMinutes).range}`,
+        );
+        log(`asset sourcing: Pexels & Pixabay 1080p API integration`);
+        log(`audio dsp: voiceover narration + auto-ducking ambient score`);
+      } else {
+        log(`engine: mini-editor/ (Short-form Fast Render) · ${duration}s`);
+      }
       log(`voice: ${gender} · ${preset} · speed ${speed}% · pitch ${pitch}%`);
       log(`theme: ${activeTheme.name} · humanless visuals enforced`);
       log(`visuals: ${artStyle} · ${imageStyle} · motion ${motion}`);
@@ -391,14 +483,13 @@ function VideoAgent() {
         captions ? `captions: ON · ${captionTemplate} · size ${captionScale}` : "captions: OFF",
         captions ? undefined : "warn",
       );
-      log(`encoder: ${quality} · ${bitrate} bitrate`);
-      if (tags.length) log(`guidance tags: ${tags.join(", ")}`);
-      log("Initializing Video Engine…");
+
+      log("Initializing Video Dispatcher…");
 
       const enrichedPrompt = prompt.trim();
-
       const { videoId: id } = await start({
         data: {
+          mode,
           prompt: enrichedPrompt,
           negative_prompt: negative.trim(),
           voice_gender: gender.toLowerCase(),
@@ -413,7 +504,8 @@ function VideoAgent() {
           aspect_ratio: ratio,
           quality,
           bitrate,
-          duration_seconds: duration,
+          duration_seconds: calculatedDurationSec,
+          duration_minutes: mode === "long" ? durationMinutes : undefined,
         },
       });
 
@@ -433,16 +525,172 @@ function VideoAgent() {
   return (
     <StudioLayout>
       <div className="space-y-3.5">
+        {/* Content Mode Selector: Short-Form vs Long-Form */}
+        <div className="rounded-3xl border border-border bg-surface/80 p-4 sm:p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-2 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Clapperboard className="h-4 w-4 text-primary" />
+                <span className="text-[14px] font-bold text-foreground">Content Mode</span>
+              </div>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                {mode === "short"
+                  ? "Short-Form (9:16 Canvas · Fast AI Render via mini-editor)"
+                  : "Long-Form (16:9 Canvas · Full HD 1080p C++ Headless Engine)"}
+              </p>
+            </div>
+            <span
+              className={cn(
+                "hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider",
+                mode === "short"
+                  ? "bg-secondary text-secondary-foreground"
+                  : "bg-primary/15 text-primary border border-primary/20",
+              )}
+            >
+              {mode === "short" ? "mini-editor" : "editor (C++)"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => handleModeChange("short")}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1 rounded-2xl border p-3.5 text-center transition-all",
+                mode === "short"
+                  ? "border-foreground/30 bg-surface-2 text-foreground shadow-sm ring-1 ring-foreground/10"
+                  : "border-border bg-background text-muted-foreground hover:border-border-strong hover:bg-surface-2/60",
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <Film className="h-3.5 w-3.5" />
+                <span className="text-[13px] font-bold">Short-Form</span>
+              </div>
+              <span className="text-[11px] font-medium opacity-70">
+                9:16 Aspect · 1-60s Duration
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleModeChange("long")}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1 rounded-2xl border p-3.5 text-center transition-all",
+                mode === "long"
+                  ? "border-primary/50 bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20"
+                  : "border-border bg-background text-muted-foreground hover:border-border-strong hover:bg-surface-2/60",
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span className="text-[13px] font-bold">Long-Form</span>
+              </div>
+              <span className="text-[11px] font-medium opacity-70">
+                16:9 Canvas · 1-15 min Documentary
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Story Prompt */}
         <div className="rounded-2xl border border-border bg-surface/60 p-4 sm:p-5">
           <TextRow
-            label="Story prompt"
+            label={mode === "long" ? "Documentary Story Prompt" : "Story prompt"}
             value={prompt}
             onChange={setPrompt}
             rows={4}
-            placeholder="Tell a story about the universe or nature…"
+            placeholder={
+              mode === "long"
+                ? "Describe your full-length nature or cosmic documentary (e.g. 'Deep ocean trenches and bioluminescent life in the midnight zone')…"
+                : "Tell a short story about the universe or nature…"
+            }
           />
         </div>
 
+        {/* Dynamic Duration Panel: Short-Form (1-60s) vs Long-Form (1-15 min with flexible logic) */}
+        {mode === "short" ? (
+          <Panel title="Video length" summary={`${duration} seconds`}>
+            <SliderRow
+              label="Seconds"
+              value={duration}
+              onChange={setDuration}
+              min={1}
+              max={60}
+              suffix="s"
+            />
+          </Panel>
+        ) : (
+          <Panel
+            title="Documentary Duration"
+            summary={`${durationMinutes} min target · ${getFlexibleDurationWindow(durationMinutes).summary}`}
+          >
+            <div className="space-y-3.5">
+              <SliderRow
+                label="Target Runtime"
+                value={durationMinutes}
+                onChange={setDurationMinutes}
+                min={1}
+                max={15}
+                suffix=" min"
+              />
+
+              <div className="rounded-2xl border border-border/80 bg-background/80 p-3.5 text-[12px] space-y-2">
+                <div className="flex items-center justify-between font-semibold">
+                  <span className="text-muted-foreground">Flexible Duration Window</span>
+                  <span className="text-primary font-bold">
+                    {getFlexibleDurationWindow(durationMinutes).range}
+                  </span>
+                </div>
+                <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                  {durationMinutes === 1
+                    ? "Target 1 min output dynamically scales between 1.0 to 1.5 minutes (60s – 90s) to preserve complete narration phrases."
+                    : `Target ${durationMinutes} min output dynamically operates within the ±1.0 min window (${durationMinutes - 1}.0 to ${durationMinutes + 1}.0 min) for natural narrative pacing.`}
+                </p>
+              </div>
+            </div>
+          </Panel>
+        )}
+
+        {/* Long-Form Advanced Engine Controls & Architecture Badge */}
+        {mode === "long" ? (
+          <div className="rounded-3xl border border-primary/20 bg-primary/[0.04] p-4 sm:p-5 space-y-3">
+            <div className="flex items-center gap-2 text-primary">
+              <Sliders className="h-4 w-4" />
+              <span className="text-[13.5px] font-bold">Headless C++ Engine Architecture</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11.5px]">
+              <div className="rounded-xl border border-border bg-surface/70 p-2.5">
+                <div className="flex items-center gap-1.5 font-bold text-foreground">
+                  <Layers className="h-3.5 w-3.5 text-primary" />
+                  <span>1080p Canvas</span>
+                </div>
+                <p className="text-muted-foreground mt-1">
+                  16:9 native canvas with Pexels & Pixabay HD asset sourcing.
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-surface/70 p-2.5">
+                <div className="flex items-center gap-1.5 font-bold text-foreground">
+                  <Volume2 className="h-3.5 w-3.5 text-primary" />
+                  <span>DSP Audio Ducking</span>
+                </div>
+                <p className="text-muted-foreground mt-1">
+                  Auto-attenuates ambient soundtrack under narration speech.
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-surface/70 p-2.5">
+                <div className="flex items-center gap-1.5 font-bold text-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  <span>60 FPS Target</span>
+                </div>
+                <p className="text-muted-foreground mt-1">
+                  Ultra-smooth 60 FPS master render with 30 FPS safety fallback.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Themes */}
         <Panel title="Theme" summary={activeTheme.name}>
           <div className="grid grid-cols-2 gap-2">
             {storyThemes.map((t) => {
@@ -467,27 +715,18 @@ function VideoAgent() {
           </div>
         </Panel>
 
-        <Panel title="Video length" summary={`${duration} seconds`}>
-          <SliderRow
-            label="Seconds"
-            value={duration}
-            onChange={setDuration}
-            min={1}
-            max={60}
-            suffix="s"
-          />
-        </Panel>
-
+        {/* Negative Prompt */}
         <Panel title="Negative prompt" summary={negative ? "Custom" : "None"}>
           <TextRow
             label="Exclude"
             value={negative}
             onChange={setNegative}
             rows={2}
-            placeholder="Buildings, cities, cartoon look, jitter…"
+            placeholder="Buildings, cities, cartoon look, jitter, text watermark…"
           />
         </Panel>
 
+        {/* Visual Guidance Chips */}
         <Panel title="Visual guidance" summary={`${tags.length} selected`}>
           <Chips
             options={guidanceTags}
@@ -498,7 +737,11 @@ function VideoAgent() {
           />
         </Panel>
 
-        <Panel title="Aspect ratio" summary={`${ratio} · ${ratioLabels[ratio]}`}>
+        {/* Aspect Ratio: highlights active mode canvas */}
+        <Panel
+          title="Aspect ratio"
+          summary={`${ratio} · ${ratioLabels[ratio]} ${mode === "long" ? "(Cinema Mode)" : "(Shorts Mode)"}`}
+        >
           <RatioBlocksWithLabels
             options={ratios}
             value={ratio}
@@ -507,6 +750,7 @@ function VideoAgent() {
           />
         </Panel>
 
+        {/* Art & Image Style */}
         <Panel title="Art style" summary={artStyle}>
           <Segment options={artStyles} value={artStyle} onChange={setArtStyle} />
         </Panel>
@@ -515,10 +759,12 @@ function VideoAgent() {
           <Segment options={imageStyles} value={imageStyle} onChange={setImageStyle} />
         </Panel>
 
+        {/* Motion */}
         <Panel title="Camera motion" summary={motion}>
           <Segment options={motionTemplates} value={motion} onChange={setMotion} />
         </Panel>
 
+        {/* Narrator Voice */}
         <Panel title="Narrator" summary={`${gender} · ${preset}`}>
           <Segment label="Voice gender" options={genders} value={gender} onChange={setGender} />
           <SelectRow
@@ -544,6 +790,7 @@ function VideoAgent() {
           <SliderRow label="Pitch" value={pitch} onChange={setPitch} suffix="%" />
         </Panel>
 
+        {/* Captions */}
         <Panel title="Captions" summary={captions ? `${captionTemplate} · ${captionScale}` : "Off"}>
           <SwitchRow label="Captions" checked={captions} onCheckedChange={setCaptions} />
           <SelectRow
@@ -580,6 +827,7 @@ function VideoAgent() {
           ) : null}
         </Panel>
 
+        {/* Quality & Bitrate */}
         <Panel title="Quality" summary={quality}>
           <SelectRow label="Quality" value={quality} options={qualities} onChange={setQuality} />
         </Panel>
@@ -588,6 +836,7 @@ function VideoAgent() {
           <SelectRow label="Bitrate" value={bitrate} options={bitrates} onChange={setBitrate} />
         </Panel>
 
+        {/* Live Build & Progress Log */}
         {lines.length > 0 ? (
           <Panel
             title="Render log"
@@ -607,16 +856,22 @@ function VideoAgent() {
           </Panel>
         ) : null}
 
+        {/* Submit Button */}
         <button
           type="button"
           disabled={busy}
           onClick={() => void render()}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-[14px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-[14px] font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60 shadow-sm"
         >
           <Play className="h-4 w-4" strokeWidth={2.2} />
-          {busy ? "Generating…" : "Generate"}
+          {busy
+            ? "Generating…"
+            : mode === "long"
+              ? `Generate Long-Form (${durationMinutes} min)`
+              : `Generate Video (${duration}s)`}
         </button>
 
+        {/* Video Playback & Download */}
         {clipUrl ? (
           <div className="space-y-3">
             <video
@@ -625,14 +880,27 @@ function VideoAgent() {
               playsInline
               className="w-full rounded-2xl border border-border bg-surface"
             />
-            <a
-              href={clipUrl}
-              download="hyper-copilot-video.mp4"
-              className="flex w-full items-center justify-center gap-2 rounded-full border border-border py-2.5 text-[13px] font-bold transition-colors hover:bg-surface-2"
-            >
-              <Download className="h-4 w-4" strokeWidth={2.2} />
-              Download MP4
-            </a>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <a
+                href={clipUrl}
+                download="hyper-copilot-video.mp4"
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border py-2.5 text-[13px] font-bold transition-colors hover:bg-surface-2"
+              >
+                <Download className="h-4 w-4" strokeWidth={2.2} />
+                Download MP4
+              </a>
+              {driveUrl ? (
+                <a
+                  href={driveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-[13px] font-bold text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                >
+                  <ExternalLink className="h-4 w-4" strokeWidth={2.2} />
+                  Google Drive
+                </a>
+              ) : null}
+            </div>
           </div>
         ) : null}
 

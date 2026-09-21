@@ -1,15 +1,16 @@
 import { SUPABASE_URL } from "@/config";
 
 export type CopilotActionType =
-  "text" | "text-to-image" | "image-to-image" | "image-to-video" | "check-video";
+  "text" | "text-to-image" | "image-to-video" | "image-analyse" | "text-to-audio" | "check-video";
 
 export type CopilotApiResponse = {
   ok: boolean;
-  type?: "text" | "image" | "video";
+  type?: "text" | "image" | "video" | "audio";
   text?: string;
   model?: string;
   imageUrl?: string;
   videoUrl?: string;
+  audioUrl?: string;
   requestId?: string;
   status?: "PENDING" | "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED" | "ERROR";
   error?: string;
@@ -19,18 +20,18 @@ const COPILOT_EDGE_URL = `${SUPABASE_URL}/functions/v1/copilot`;
 
 export async function executeCopilotApi(payload: {
   action: CopilotActionType;
+  modelTier?: "speed" | "flash" | "heavy";
   prompt?: string;
+  text?: string;
   messages?: Array<{ role: string; content: string }>;
   imageUrl?: string;
-  maskUrl?: string;
-  negativePrompt?: string;
+  voice?: string;
   aspect?: string;
   width?: number;
   height?: number;
   steps?: number;
   seed?: number;
   requestId?: string;
-  wait?: boolean;
 }): Promise<CopilotApiResponse> {
   try {
     const res = await fetch(COPILOT_EDGE_URL, {

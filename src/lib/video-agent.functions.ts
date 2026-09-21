@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { visualStylePrompt } from "@/lib/style-presets";
 
 export type VideoAgentConfig = {
+  mode?: "short" | "long";
   prompt: string;
   negative_prompt: string;
   voice_gender: string;
@@ -18,20 +19,34 @@ export type VideoAgentConfig = {
   quality: string;
   bitrate: string;
   duration_seconds: number;
+  duration_minutes?: number;
 };
 
 function validate(input: VideoAgentConfig): VideoAgentConfig {
   if (!input || typeof input.prompt !== "string" || !input.prompt.trim()) {
     throw new Error("A prompt is required");
   }
-  const duration = Math.round(Number(input.duration_seconds ?? 15));
+  const isLong =
+    input.mode === "long" || input.aspect_ratio === "16:9" || Number(input.duration_seconds) > 60;
+  const maxDuration = isLong ? 900 : 60;
+  const rawDuration = Math.round(Number(input.duration_seconds ?? (isLong ? 300 : 15)));
   const scale = Math.round(Number(input.caption_scale ?? 4));
+
   return {
-    duration_seconds: Math.min(60, Math.max(1, Number.isFinite(duration) ? duration : 15)),
+    mode: isLong ? "long" : "short",
+    duration_seconds: Math.min(
+      maxDuration,
+      Math.max(1, Number.isFinite(rawDuration) ? rawDuration : 15),
+    ),
+    duration_minutes: input.duration_minutes
+      ? Math.min(15, Math.max(1, Math.round(input.duration_minutes)))
+      : undefined,
     prompt: input.prompt.trim().slice(0, 4000),
     negative_prompt: String(input.negative_prompt ?? "").slice(0, 2000),
     voice_gender: String(input.voice_gender ?? "male").toLowerCase(),
-    voice_persona: String(input.voice_persona ?? "Cinematic Narrator"),
+    voice_persona: String(
+      input.voice_persona ?? (isLong ? "Cosmic Documentary" : "Cinematic Narrator"),
+    ),
     voice_speed: Number(input.voice_speed ?? 110),
     voice_pitch: Number(input.voice_pitch ?? 52),
     image_style: String(
@@ -41,7 +56,7 @@ function validate(input: VideoAgentConfig): VideoAgentConfig {
     captions: Boolean(input.captions),
     caption_style: String(input.caption_style ?? "Neon Glow"),
     caption_scale: Math.min(10, Math.max(1, Number.isFinite(scale) ? scale : 4)),
-    aspect_ratio: input.aspect_ratio === "16:9" ? "16:9" : "9:16",
+    aspect_ratio: input.aspect_ratio === "16:9" || isLong ? "16:9" : "9:16",
     quality: input.quality === "720p" ? "720p" : "1080p",
     bitrate: input.bitrate === "Standard" ? "Standard" : "High",
   };
@@ -61,11 +76,14 @@ export const startVideoRender = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { createVideoRequest, dispatchVideoRender } = await import("@/lib/video-agent.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     const videoId = await createVideoRequest(context.supabase, context.userId, data);
+
     // Standardize direct backend invocation to the edge function
     dispatchVideoRender(supabaseAdmin, videoId).catch((err) => {
       console.warn("[VideoAgent] Async render dispatch error:", err);
     });
+
     return { videoId };
   });
 
@@ -82,7 +100,6 @@ export const getVideoPlaybackUrl = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-
     const { data: row } = await supabase
       .from("videos")
       .select("video_url")

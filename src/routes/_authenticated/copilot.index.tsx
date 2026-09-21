@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Image as ImageIcon, MessageSquare, Sparkles, Video } from "lucide-react";
+import { CornerDownRight } from "lucide-react";
 import { pageHead } from "@/lib/seo";
+import { supabase } from "@/config";
 import { AppIcon } from "@/components/hyper/AppIcon";
 import { CopilotShell } from "@/components/hyper/CopilotShell";
 import { CopilotComposer } from "@/components/hyper/CopilotComposer";
@@ -19,34 +20,28 @@ export const Route = createFileRoute("/_authenticated/copilot/")({
   component: CopilotEmptyStatePage,
 });
 
-const STARTER_PROMPTS = [
+const SUGGESTIONS = [
   {
-    icon: MessageSquare,
-    label: "Nvidia Nemotron 3 Ultra Script",
-    model: "nvidia-nemotron",
+    text: "Design a book cover for my life story",
     prompt:
-      "Write a high-retention 30-second video script for TikTok/Reels, complete with visual hooks, B-roll cues, and call to action.",
+      "A cinematic and evocative book cover design for a memoir titled 'The Journey Within', featuring elegant typography and soft atmospheric lighting, 8k resolution.",
+    model: "copilot-flash",
   },
   {
-    icon: ImageIcon,
-    label: "Pixazo Flux 1 Schnell Image",
-    model: "pixazo-flux",
-    prompt:
-      "A cinematic shot of a futuristic cyberpunk city at twilight with glowing neon reflections on wet asphalt, 8k resolution.",
+    text: "Quiz me on film and cinema",
+    prompt: "Quiz me on iconic film and cinema trivia. Start with question 1.",
+    model: "copilot-speed",
   },
   {
-    icon: Video,
-    label: "Pixazo LTX 2.5 Video Generation",
-    model: "pixazo-ltx",
-    prompt:
-      "A slow dynamic camera zoom into a misty mountain sunrise with golden rays piercing through evergreen pine trees.",
+    text: "Translate Hindi phrases",
+    prompt: "Help me translate everyday conversational Hindi phrases into natural English.",
+    model: "copilot-speed",
   },
   {
-    icon: Sparkles,
-    label: "Multi-channel Launch Strategy",
-    model: "nvidia-nemotron",
+    text: "Create a cinematic video scene",
     prompt:
-      "Create a 7-day multi-channel launch campaign for my product across social media, email, and community channels.",
+      "/video A slow dynamic camera zoom into a misty mountain sunrise with golden rays piercing through evergreen trees.",
+    model: "copilot-heavy",
   },
 ];
 
@@ -54,8 +49,27 @@ function CopilotEmptyStatePage() {
   const navigate = useNavigate();
   const [value, setValue] = useState("");
   const [attachment, setAttachment] = useState<string | null>(null);
-  const [model, setModel] = useState(COPILOT_MODELS[0]?.id ?? "nvidia-nemotron");
+  const [model, setModel] = useState(COPILOT_MODELS[1]?.id ?? "copilot-flash");
   const [pending, setPending] = useState(false);
+  const [userName, setUserName] = useState("Tushar Kanti");
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data?.user;
+      if (user?.user_metadata?.full_name) {
+        setUserName(user.user_metadata.full_name);
+      } else if (user?.user_metadata?.name) {
+        setUserName(user.user_metadata.name);
+      } else if (user?.email) {
+        if (user.email.toLowerCase().includes("tushar")) {
+          setUserName("Tushar Kanti");
+        } else {
+          const prefix = user.email.split("@")[0];
+          setUserName(prefix.charAt(0).toUpperCase() + prefix.slice(1));
+        }
+      }
+    });
+  }, []);
 
   const handleStart = (promptText: string, forcedModel?: string) => {
     const text = promptText.trim();
@@ -71,45 +85,39 @@ function CopilotEmptyStatePage() {
 
   return (
     <CopilotShell active="new">
-      <section className="relative flex min-h-[calc(100vh-110px)] flex-col">
-        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 pb-40 pt-8 text-center sm:px-6">
-          <div className="flex flex-col items-center">
-            <AppIcon className="h-14 w-14 rounded-2xl shadow-sm ring-1 ring-border" />
-            <h1 className="mt-5 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              What would you like to create?
-            </h1>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              Generate AI scripts with Nvidia Nemotron, create images with Pixazo Flux 1 Schnell, or
-              produce motion with Pixazo LTX 2.5.
-            </p>
-          </div>
+      <section className="relative flex min-h-[calc(100vh-110px)] flex-col justify-between">
+        <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-4 pb-36 pt-8 text-center sm:px-6">
+          {/* App Icon (dark / light responsive) */}
+          <AppIcon className="h-12 w-12 rounded-2xl shadow-sm ring-1 ring-border/40 animate-in fade-in zoom-in-95 duration-300" />
 
-          <div className="mt-8 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2 text-left">
-            {STARTER_PROMPTS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    setModel(item.model);
-                    handleStart(item.prompt, item.model);
-                  }}
-                  className="group flex flex-col justify-between rounded-xl border border-border bg-surface p-3.5 text-left transition-all hover:border-border-strong hover:bg-surface-2 hover:shadow-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <Icon
-                      className="h-4 w-4 text-muted-foreground group-hover:text-foreground"
-                      strokeWidth={2}
-                    />
-                    <span className="text-[13px] font-semibold text-foreground">{item.label}</span>
-                  </div>
-                  <p className="mt-1.5 line-clamp-2 text-[11.5px] leading-relaxed text-muted-foreground">
-                    {item.prompt}
-                  </p>
-                </button>
-              );
-            })}
+          {/* Heading */}
+          <h1 className="mt-5 text-2xl font-normal tracking-tight text-foreground sm:text-3xl leading-snug text-center">
+            What can I help with,
+            <br />
+            {userName}?
+          </h1>
+
+          {/* Prompt templates centered horizontally on screen */}
+          <div className="mt-10 flex w-full flex-col items-center justify-center space-y-3.5 text-center">
+            {SUGGESTIONS.map((item) => (
+              <button
+                key={item.text}
+                type="button"
+                onClick={() => {
+                  setModel(item.model);
+                  handleStart(item.prompt, item.model);
+                }}
+                className="group inline-flex items-center justify-center gap-2.5 max-w-md transition-colors py-1 cursor-pointer text-center"
+              >
+                <CornerDownRight
+                  className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors shrink-0"
+                  strokeWidth={2}
+                />
+                <span className="text-[14.5px] sm:text-[15px] text-muted-foreground group-hover:text-foreground transition-colors font-normal leading-snug">
+                  {item.text}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 

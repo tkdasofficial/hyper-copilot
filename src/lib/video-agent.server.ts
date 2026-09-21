@@ -62,17 +62,37 @@ async function invokeRenderDispatch(
   }
 
   try {
-    const { data: payload, error: invokeErr } = await admin.functions.invoke<{
-      ok?: boolean;
-      error?: string;
-    }>("video-agent", {
-      body: { action: "dispatch", videoId },
-      headers: { "x-worker-secret": workerSecret },
-    });
+    let payload: { ok?: boolean; error?: string } | null = null;
+    let invokeErr: { message?: string } | Error | null = null;
+    try {
+      const res = await admin.functions.invoke<{ ok?: boolean; error?: string }>(
+        "video-dispatcher",
+        {
+          body: { action: "dispatch", videoId },
+          headers: { "x-worker-secret": workerSecret },
+        },
+      );
+      payload = res.data;
+      invokeErr = res.error;
+    } catch (e) {
+      invokeErr = e;
+    }
+
     if (invokeErr || !payload || payload.ok !== true) {
+      const fb = await admin.functions.invoke<{ ok?: boolean; error?: string }>("video-agent", {
+        body: { action: "dispatch", videoId },
+        headers: { "x-worker-secret": workerSecret },
+      });
+      if (fb.data && fb.data.ok === true) {
+        return { ok: true };
+      }
       return {
         ok: false,
-        error: payload?.error ?? invokeErr?.message ?? "The render service refused the job.",
+        error:
+          payload?.error ??
+          fb.data?.error ??
+          invokeErr?.message ??
+          "The render service refused the job.",
       };
     }
     return { ok: true };
