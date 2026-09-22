@@ -4,16 +4,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   Download,
   ExternalLink,
-  Play,
-  Sparkles,
-  Film,
   ChevronDown,
   ChevronUp,
-  Subtitles,
   CheckCircle2,
   Clock,
   Loader2,
-  Music,
   Terminal,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,14 +20,13 @@ import { supabase } from "@/config";
 import { getVideoPlaybackUrl, startVideoRender } from "@/lib/video-agent.functions";
 import { cn } from "@/lib/utils";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
+  Panel,
+  Segment,
+  SliderRow,
+  SwitchRow,
+  TextRow,
+} from "@/components/hyper/StudioControls";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
 export const Route = createFileRoute("/video-agent")({
@@ -72,6 +66,13 @@ const FRAME_RATES = ["30 FPS", "60 FPS"] as const;
 const VOICE_GENDERS = ["Male", "Female"] as const;
 const CAPTION_STYLES = ["Minimal", "Bold", "Dynamic"] as const;
 const CAPTION_SIZES = ["Small", "Medium", "Large"] as const;
+const MODES = ["Long-form", "Short-form"] as const;
+const STAGES = [
+  { stage: 1, label: "Scripting" },
+  { stage: 2, label: "Voiceover" },
+  { stage: 3, label: "Render" },
+  { stage: 4, label: "Complete" },
+] as const;
 
 type LogLine = { time: string; text: string; tone?: "ok" | "warn" | "err" };
 
@@ -111,7 +112,6 @@ function VideoAgent() {
   const [mode, setMode] = useState<"short" | "long">("long");
   const [prompt, setPrompt] = useState("");
   const [negative, setNegative] = useState("");
-  const [showNegative, setShowNegative] = useState(false);
 
   const [resolution, setResolution] = useState<(typeof RESOLUTIONS)[number]>("1080p Full HD");
   const [fps, setFps] = useState<(typeof FRAME_RATES)[number]>("60 FPS");
@@ -337,346 +337,141 @@ function VideoAgent() {
 
   return (
     <StudioLayout>
-      <div className="mx-auto max-w-2xl space-y-4 pb-12">
-        {/* Mode Toggle Header */}
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <div>
-            <h1 className="text-base font-bold text-foreground">Video Generator</h1>
-          </div>
-
-          <div className="flex items-center rounded-full border border-border bg-surface p-1">
-            <button
-              type="button"
-              onClick={() => setMode("short")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
-                mode === "short"
-                  ? "bg-foreground text-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Film className="h-3.5 w-3.5" />
-              <span>Short-Form</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("long")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
-                mode === "long"
-                  ? "bg-foreground text-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>Long-Form</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="space-y-4 rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-sm">
-          {/* Describe / Topic Input */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label htmlFor="video-topic-prompt" className="text-xs font-semibold text-foreground">
-                Documentary Idea / Topic
-              </label>
-              <span className="text-[11px] text-muted-foreground">
-                {mode === "long" ? "16:9 Landscape" : "9:16 Reel"}
-              </span>
-            </div>
-            <textarea
-              id="video-topic-prompt"
-              rows={3}
+      <div className="space-y-3.5">
+        <div className="rounded-2xl border border-border bg-surface/50 p-3.5">
+          <Segment
+            options={MODES}
+            value={mode === "long" ? "Long-form" : "Short-form"}
+            onChange={(v) => setMode(v === "Long-form" ? "long" : "short")}
+          />
+          <div className="mt-3.5">
+            <TextRow
+              label={mode === "long" ? "Documentary idea / topic" : "Short-form idea"}
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              disabled={busy}
+              onChange={setPrompt}
+              rows={3}
               placeholder={
                 mode === "long"
-                  ? "Describe your documentary idea or topic (e.g., Deep ocean trenches and marine biology)..."
-                  : "Enter your short-form video idea..."
+                  ? "Deep ocean trenches and the creatures that survive there…"
+                  : "A 15-second hook about the deepest place on Earth…"
               }
-              className="w-full resize-none rounded-xl border border-border bg-background p-3 text-xs leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:border-foreground/40 focus:outline-none focus:ring-1 focus:ring-foreground/20 disabled:opacity-50"
             />
-
-            {/* Negative Prompt Accordion */}
-            <div>
-              <button
-                type="button"
-                id="negative-prompt-toggle"
-                onClick={() => setShowNegative(!showNegative)}
-                className="flex items-center gap-1 text-[11.5px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showNegative ? (
-                  <ChevronUp className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                )}
-                <span>{showNegative ? "Hide negative prompt" : "Negative prompt (exclude)"}</span>
-              </button>
-
-              {showNegative && (
-                <div className="pt-2">
-                  <input
-                    id="negative-prompt-input"
-                    type="text"
-                    value={negative}
-                    onChange={(e) => setNegative(e.target.value)}
-                    disabled={busy}
-                    placeholder="e.g. blurry, glitch, text watermarks, cartoon"
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-foreground/40 focus:outline-none focus:ring-1 focus:ring-foreground/20 disabled:opacity-50"
-                  />
-                </div>
-              )}
-            </div>
           </div>
-
-          <div className="h-px bg-border/60" />
-
-          {/* Specs: Resolution, FPS, Duration */}
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              {/* Resolution */}
-              <div className="space-y-1.5">
-                <span className="text-[11.5px] font-semibold text-muted-foreground">
-                  Resolution
-                </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {RESOLUTIONS.map((res) => (
-                    <button
-                      key={res}
-                      type="button"
-                      onClick={() => setResolution(res)}
-                      className={cn(
-                        "rounded-xl border py-2 text-xs font-semibold transition-all text-center",
-                        resolution === res
-                          ? "border-foreground bg-foreground text-background shadow-sm"
-                          : "border-border bg-background text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {res.replace(" Full HD", "").replace(" HD", "")}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Frame Rate */}
-              <div className="space-y-1.5">
-                <span className="text-[11.5px] font-semibold text-muted-foreground">
-                  Frame Rate
-                </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {FRAME_RATES.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => setFps(f)}
-                      className={cn(
-                        "rounded-xl border py-2 text-xs font-semibold transition-all text-center",
-                        fps === f
-                          ? "border-foreground bg-foreground text-background shadow-sm"
-                          : "border-border bg-background text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Duration Slider */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-muted-foreground">Duration</span>
-                <span className="text-foreground">
-                  {mode === "long" ? `${durationMinutes} min` : `${durationSecondsShort} sec`}
-                </span>
-              </div>
-              {mode === "long" ? (
-                <Slider
-                  value={[durationMinutes]}
-                  onValueChange={([val]) => setDurationMinutes(val || 3)}
-                  min={1}
-                  max={15}
-                  step={1}
-                  disabled={busy}
-                  className="py-1"
-                />
-              ) : (
-                <Slider
-                  value={[durationSecondsShort]}
-                  onValueChange={([val]) => setDurationSecondsShort(val || 15)}
-                  min={5}
-                  max={60}
-                  step={5}
-                  disabled={busy}
-                  className="py-1"
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="h-px bg-border/60" />
-
-          {/* Category & Visual Style */}
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <span className="text-[11.5px] font-semibold text-muted-foreground">Category</span>
-              <Select
-                value={category}
-                onValueChange={(val) => setCategory(val as (typeof CATEGORIES)[number])}
-              >
-                <SelectTrigger
-                  id="category-selector"
-                  className="h-10 w-full rounded-xl border-border bg-background text-xs font-semibold"
-                >
-                  <SelectValue placeholder="Select Category" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-border bg-surface shadow-lg">
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat} className="text-xs font-medium py-2">
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="text-[11.5px] font-semibold text-muted-foreground">
-                Visual Style
-              </span>
-              <div className="grid grid-cols-3 gap-1.5">
-                {VISUAL_STYLES.map((style) => (
-                  <button
-                    key={style}
-                    type="button"
-                    onClick={() => setVisualStyle(style)}
-                    className={cn(
-                      "rounded-xl border py-2 px-2 text-xs font-semibold transition-all text-center truncate",
-                      visualStyle === style
-                        ? "border-foreground bg-foreground text-background shadow-sm"
-                        : "border-border bg-background text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {style}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="h-px bg-border/60" />
-
-          {/* Voiceover & Audio Configuration */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <span className="text-[11.5px] font-semibold text-muted-foreground">
-                Voice Gender
-              </span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {VOICE_GENDERS.map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setVoiceGender(g)}
-                    className={cn(
-                      "rounded-xl border py-2 text-xs font-semibold transition-all text-center",
-                      voiceGender === g
-                        ? "border-foreground bg-foreground text-background shadow-sm"
-                        : "border-border bg-background text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="text-[11.5px] font-semibold text-muted-foreground">
-                Background Music
-              </span>
-              <div className="flex h-10 items-center justify-between rounded-xl border border-border bg-background px-3">
-                <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
-                  <Music className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>Music</span>
-                </div>
-                <Switch checked={bgm} onCheckedChange={setBgm} />
-              </div>
-            </div>
-          </div>
-
-          <div className="h-px bg-border/60" />
-
-          {/* Captions & Subtitles */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <Subtitles className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Captions</span>
-              </div>
-              <Switch checked={captions} onCheckedChange={setCaptions} />
-            </div>
-
-            {captions && (
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-medium text-muted-foreground">Style</span>
-                  <div className="grid grid-cols-3 gap-1">
-                    {CAPTION_STYLES.map((st) => (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => setCaptionStyle(st)}
-                        className={cn(
-                          "rounded-lg border py-1.5 text-[11px] font-semibold transition-all text-center",
-                          captionStyle === st
-                            ? "border-foreground bg-foreground text-background"
-                            : "border-border bg-background text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {st}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-medium text-muted-foreground">Size</span>
-                  <div className="grid grid-cols-3 gap-1">
-                    {CAPTION_SIZES.map((sz) => (
-                      <button
-                        key={sz}
-                        type="button"
-                        onClick={() => setCaptionSize(sz)}
-                        className={cn(
-                          "rounded-lg border py-1.5 text-[11px] font-semibold transition-all text-center",
-                          captionSize === sz
-                            ? "border-foreground bg-foreground text-background"
-                            : "border-border bg-background text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {sz}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="mt-3.5">
+            <TextRow
+              label="Negative prompt"
+              value={negative}
+              onChange={setNegative}
+              rows={2}
+              placeholder="blurry, glitch, text watermarks, cartoon"
+            />
           </div>
         </div>
 
-        {/* Real-Time Progress / Output Tracker */}
-        {(busy || status || lines.length > 0) && (
-          <div className="space-y-3 rounded-2xl border border-border bg-surface p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-bold text-foreground">Status</div>
+        <Panel
+          title="Format"
+          summary={`${mode === "long" ? "16:9" : "9:16"} · ${resolution.replace(" Full HD", "").replace(" HD", "")} · ${fps} · ${mode === "long" ? `${durationMinutes} min` : `${durationSecondsShort}s`}`}
+          defaultOpen
+        >
+          <Segment
+            label="Resolution"
+            options={RESOLUTIONS}
+            value={resolution}
+            onChange={setResolution}
+          />
+          <Segment label="Frame rate" options={FRAME_RATES} value={fps} onChange={setFps} />
+          {mode === "long" ? (
+            <SliderRow
+              label="Duration"
+              value={durationMinutes}
+              onChange={setDurationMinutes}
+              min={1}
+              max={15}
+              suffix=" min"
+            />
+          ) : (
+            <SliderRow
+              label="Duration"
+              value={durationSecondsShort}
+              onChange={setDurationSecondsShort}
+              min={5}
+              max={60}
+              step={5}
+              suffix="s"
+            />
+          )}
+        </Panel>
+
+        <Panel title="Story & style" summary={`${category} · ${visualStyle}`}>
+          <Segment label="Category" options={CATEGORIES} value={category} onChange={setCategory} />
+          <Segment
+            label="Visual style"
+            options={VISUAL_STYLES}
+            value={visualStyle}
+            onChange={setVisualStyle}
+          />
+        </Panel>
+
+        <Panel title="Audio" summary={`${voiceGender} voice · ${bgm ? "Music on" : "No music"}`}>
+          <Segment
+            label="Voice gender"
+            options={VOICE_GENDERS}
+            value={voiceGender}
+            onChange={setVoiceGender}
+          />
+          <SwitchRow
+            label="Background music"
+            desc="Adds a licensed score under the voiceover"
+            checked={bgm}
+            onCheckedChange={setBgm}
+          />
+        </Panel>
+
+        <Panel
+          title="Captions"
+          summary={captions ? `${captionStyle} · ${captionSize}` : "Off"}
+        >
+          <SwitchRow
+            label="Burn-in captions"
+            desc="Word-synced subtitles on the final video"
+            checked={captions}
+            onCheckedChange={setCaptions}
+          />
+          {captions ? (
+            <>
+              <Segment
+                label="Style"
+                options={CAPTION_STYLES}
+                value={captionStyle}
+                onChange={setCaptionStyle}
+              />
+              <Segment
+                label="Size"
+                options={CAPTION_SIZES}
+                value={captionSize}
+                onChange={setCaptionSize}
+              />
+            </>
+          ) : null}
+        </Panel>
+
+        <Button
+          type="button"
+          id="generate-video-action-btn"
+          disabled={busy}
+          onClick={() => void handleGenerateVideo()}
+          className="h-11 w-full rounded-full text-[14px] font-bold"
+        >
+          {busy ? `Generating… ${progress}%` : "Generate"}
+        </Button>
+
+        {busy || status || lines.length > 0 ? (
+          <div className="space-y-3.5 rounded-2xl border border-border bg-surface/50 p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[13px] font-bold tracking-tight">Render status</p>
               <span
                 className={cn(
-                  "rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase",
+                  "shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase",
                   status === "completed"
                     ? "bg-emerald-500/15 text-emerald-400"
                     : status === "failed"
@@ -684,30 +479,24 @@ function VideoAgent() {
                       : "bg-foreground/10 text-foreground",
                 )}
               >
-                {status || "Queued"}
+                {status ?? "Queued"}
               </span>
             </div>
 
-            {/* Stage Indicators */}
             <div className="grid grid-cols-4 gap-1.5">
-              {[
-                { stage: 1, label: "Scripting" },
-                { stage: 2, label: "Voiceover" },
-                { stage: 3, label: "Render" },
-                { stage: 4, label: "Complete" },
-              ].map((s) => {
+              {STAGES.map((s) => {
                 const isPassed = activeStage > s.stage || status === "completed";
                 const isCurrent = activeStage === s.stage && status !== "completed";
                 return (
                   <div
                     key={s.stage}
                     className={cn(
-                      "flex items-center justify-center gap-1 rounded-xl border py-2 px-1 text-[11px] font-semibold transition-all text-center",
+                      "flex items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[11px] font-semibold",
                       isPassed
                         ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
                         : isCurrent
-                          ? "border-foreground bg-foreground/10 text-foreground"
-                          : "border-border/50 bg-background/50 text-muted-foreground/50",
+                          ? "border-border-strong bg-background text-foreground"
+                          : "border-border bg-background text-muted-foreground/60",
                     )}
                   >
                     {isPassed ? (
@@ -723,98 +512,72 @@ function VideoAgent() {
               })}
             </div>
 
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] text-muted-foreground">
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[11.5px] text-muted-foreground">
                 <span className="truncate">{step}</span>
-                <span className="font-semibold tabular-nums">{progress}%</span>
+                <span className="font-bold tabular-nums">{progress}%</span>
               </div>
               <Progress value={progress} className="h-1.5 rounded-full" />
             </div>
 
-            {/* Collapsible Log Stream */}
-            <div className="pt-1">
-              <button
+            <div>
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowLogs(!showLogs)}
-                className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                className="h-7 px-1.5 text-[11.5px] text-muted-foreground hover:text-foreground"
               >
-                <Terminal className="h-3 w-3" />
-                <span>{showLogs ? "Hide logs" : "View terminal logs"}</span>
-                {showLogs ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              </button>
-              {showLogs && (
+                <Terminal className="h-3.5 w-3.5" />
+                <span>{showLogs ? "Hide logs" : "View logs"}</span>
+                {showLogs ? (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+              </Button>
+              {showLogs ? (
                 <div className="pt-2">
                   <Console lines={lines} />
                 </div>
-              )}
+              ) : null}
             </div>
-
-            {/* Video Playback & Downloads */}
-            {clipUrl && (
-              <div className="space-y-3 pt-2 border-t border-border">
-                <video
-                  src={clipUrl}
-                  controls
-                  playsInline
-                  className="w-full rounded-xl border border-border bg-black aspect-video max-h-[320px] object-contain shadow"
-                />
-                <div className="flex gap-2">
-                  <a
-                    href={clipUrl}
-                    download="rendered-video.mp4"
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-foreground text-background py-2.5 text-xs font-bold transition-opacity hover:opacity-90"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download MP4
-                  </a>
-                  {driveUrl && (
-                    <a
-                      href={driveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-xs font-bold text-emerald-400 transition-colors hover:bg-emerald-500/20"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Google Drive
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
-        )}
+        ) : null}
 
-        {/* Action Button */}
-        <div className="pt-1">
-          <button
-            type="button"
-            id="generate-video-action-btn"
-            disabled={busy}
-            onClick={() => void handleGenerateVideo()}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-sm font-bold text-primary-foreground transition-all hover:opacity-90 disabled:opacity-60 shadow-sm"
-          >
-            {busy ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Generating ({progress}%)…</span>
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 fill-current" />
-                <span>
-                  {mode === "long"
-                    ? `Generate Video (${durationMinutes} min)`
-                    : `Generate Video (${durationSecondsShort}s)`}
-                </span>
-              </>
-            )}
-          </button>
-        </div>
+        {clipUrl ? (
+          <div className="space-y-2.5">
+            <video
+              src={clipUrl}
+              controls
+              playsInline
+              className="w-full rounded-2xl border border-border bg-surface"
+            />
+            <div className="flex gap-2">
+              <a
+                href={clipUrl}
+                download="rendered-video.mp4"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-background py-2.5 text-[12.5px] font-semibold transition-colors hover:bg-surface-2"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download MP4
+              </a>
+              {driveUrl ? (
+                <a
+                  href={driveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-background py-2.5 text-[12.5px] font-semibold transition-colors hover:bg-surface-2"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Google Drive
+                </a>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
-        {/* Historical Creations */}
-        <div className="pt-4">
-          <RecentCreations />
-        </div>
+        <RecentCreations />
       </div>
     </StudioLayout>
   );
