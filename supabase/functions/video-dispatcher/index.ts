@@ -270,7 +270,7 @@ Deno.serve(async (req: Request) => {
         .from("videos")
         .update({
           status: "processing",
-          step: isLong ? "Initializing Long-Form C++ Engine" : "Initializing Video Engine",
+          step: isLong ? "Initializing Video Engine" : "Initializing Reel Engine",
           progress: 5,
           error: null,
         })
@@ -389,9 +389,7 @@ Deno.serve(async (req: Request) => {
             .update({
               status: "processing",
               step:
-                requestedMode === "long"
-                  ? "Initializing Long-Form C++ Engine"
-                  : "Initializing Video Engine",
+                requestedMode === "long" ? "Initializing Video Engine" : "Initializing Reel Engine",
               progress: 5,
               error: null,
             })

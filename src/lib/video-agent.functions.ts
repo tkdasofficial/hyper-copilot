@@ -122,10 +122,13 @@ export const getVideoPlaybackUrl = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: row } = await supabase
       .from("videos")
-      .select("video_url")
+      .select("video_url, direct_download_url")
       .eq("id", data.videoId)
       .eq("user_id", userId)
       .maybeSingle();
+
+    const direct = row?.direct_download_url ?? null;
+    if (direct && /^https?:\/\//i.test(direct)) return { url: direct };
 
     const stored = row?.video_url ?? null;
     if (!stored) return { url: null };

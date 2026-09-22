@@ -327,8 +327,10 @@ export type Database = {
           caption_style: string;
           captions: boolean;
           created_at: string;
+          direct_download_url: string | null;
           duration_seconds: number;
           error: string | null;
+          file_id: string | null;
           id: string;
           image_style: string;
           logs: Json;
@@ -339,6 +341,7 @@ export type Database = {
           quality: string;
           status: string;
           step: string | null;
+          title: string | null;
           updated_at: string;
           user_id: string;
           video_url: string | null;
@@ -354,8 +357,10 @@ export type Database = {
           caption_style?: string;
           captions?: boolean;
           created_at?: string;
+          direct_download_url?: string | null;
           duration_seconds?: number;
           error?: string | null;
+          file_id?: string | null;
           id?: string;
           image_style?: string;
           logs?: Json;
@@ -366,6 +371,7 @@ export type Database = {
           quality?: string;
           status?: string;
           step?: string | null;
+          title?: string | null;
           updated_at?: string;
           user_id: string;
           video_url?: string | null;
@@ -381,8 +387,10 @@ export type Database = {
           caption_style?: string;
           captions?: boolean;
           created_at?: string;
+          direct_download_url?: string | null;
           duration_seconds?: number;
           error?: string | null;
+          file_id?: string | null;
           id?: string;
           image_style?: string;
           logs?: Json;
@@ -393,6 +401,7 @@ export type Database = {
           quality?: string;
           status?: string;
           step?: string | null;
+          title?: string | null;
           updated_at?: string;
           user_id?: string;
           video_url?: string | null;

@@ -19,13 +19,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/config";
 import { getVideoPlaybackUrl, startVideoRender } from "@/lib/video-agent.functions";
 import { cn } from "@/lib/utils";
-import {
-  Panel,
-  Segment,
-  SliderRow,
-  SwitchRow,
-  TextRow,
-} from "@/components/hyper/StudioControls";
+import { Panel, Segment, SliderRow, SwitchRow, TextRow } from "@/components/hyper/StudioControls";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
@@ -220,7 +214,9 @@ function VideoAgent() {
 
       if (rowStatus === "completed") {
         setProgress(100);
-        const raw = typeof row["video_url"] === "string" ? row["video_url"] : null;
+        const direct =
+          typeof row["direct_download_url"] === "string" ? row["direct_download_url"] : null;
+        const raw = direct || (typeof row["video_url"] === "string" ? row["video_url"] : null);
         if (raw && /^https?:\/\//i.test(raw)) {
           setClipUrl(raw);
         } else if (raw) {
@@ -229,8 +225,11 @@ function VideoAgent() {
           );
         }
 
+        const fileId = typeof row["file_id"] === "string" ? row["file_id"] : null;
         if (typeof row["drive_url"] === "string" && row["drive_url"]) {
           setDriveUrl(row["drive_url"]);
+        } else if (fileId) {
+          setDriveUrl(`https://drive.google.com/file/d/${fileId}/view`);
         } else {
           for (const entry of rowLogs) {
             const text = String(entry);
@@ -427,10 +426,7 @@ function VideoAgent() {
           />
         </Panel>
 
-        <Panel
-          title="Captions"
-          summary={captions ? `${captionStyle} · ${captionSize}` : "Off"}
-        >
+        <Panel title="Captions" summary={captions ? `${captionStyle} · ${captionSize}` : "Off"}>
           <SwitchRow
             label="Burn-in captions"
             desc="Word-synced subtitles on the final video"

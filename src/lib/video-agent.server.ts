@@ -167,9 +167,7 @@ async function invokeRenderDispatch(
             );
 
             if (ghRes.ok) {
-              const stepDesc = isLong
-                ? "Initializing Long-Form C++ Engine"
-                : "Initializing Video Engine";
+              const stepDesc = isLong ? "Initializing Video Engine" : "Initializing Reel Engine";
               await admin
                 .from("videos")
                 .update({
@@ -366,7 +364,7 @@ export async function dispatchVideoRender(
     .from("videos")
     .update({
       status: "processing",
-      step: isLong ? "Initializing Long-Form C++ Engine" : "Initializing Video Engine",
+      step: isLong ? "Initializing Video Engine" : "Initializing Reel Engine",
     })
     .eq("id", videoId);
 

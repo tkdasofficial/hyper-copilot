@@ -16,6 +16,8 @@ export const FOLDER_NAMES = {
   CHATS: "Chats",
 } as const;
 
+export const DEFAULT_MAIN_FOLDER_ID = "1JGjibA287ds3SFoT_Fl2z8cJ96eCDUFs";
+
 type SubfolderType = (typeof FOLDER_NAMES)[keyof typeof FOLDER_NAMES];
 
 // In-memory cache for folder IDs to reduce Drive API queries
@@ -112,10 +114,17 @@ async function getGoogleDriveAccessToken(): Promise<string> {
     return cachedAccessToken.token;
   }
 
-  let clientEmail = getEnv("GDRIVE_CLIENT_EMAIL")
+  let clientEmail = (getEnv("GDRIVE_CLIENT_EMAIL") || getEnv("GOOGLE_CLIENT_EMAIL") || "")
     .replace(/^["']|["']$/g, "")
     .trim();
-  let rawKey = getEnv("GDRIVE_PRIVATE_KEY");
+
+  let rawKey =
+    getEnv("GDRIVE_PRIVATE_KEY") ||
+    getEnv("SERVICE_ACCOUNT_JSON") ||
+    getEnv("GOOGLE_SERVICE_ACCOUNT_JSON") ||
+    getEnv("GDRIVE_SERVICE_ACCOUNT_JSON") ||
+    getEnv("GOOGLE_APPLICATION_CREDENTIALS_JSON") ||
+    "";
 
   if (rawKey.trim().startsWith("{")) {
     try {
@@ -133,7 +142,7 @@ async function getGoogleDriveAccessToken(): Promise<string> {
 
   if (!clientEmail || !rawKey) {
     throw new Error(
-      "Missing Google Drive Service Account credentials: GDRIVE_CLIENT_EMAIL or GDRIVE_PRIVATE_KEY not set.",
+      "Missing Google Drive Service Account credentials: GDRIVE_CLIENT_EMAIL, GDRIVE_PRIVATE_KEY, or SERVICE_ACCOUNT_JSON not set.",
     );
   }
 
@@ -151,14 +160,21 @@ async function getGoogleDriveAccessToken(): Promise<string> {
     ["sign"],
   );
 
+  const delegatedUser =
+    getEnv("GDRIVE_DELEGATED_USER") ||
+    getEnv("GDRIVE_USER_EMAIL") ||
+    "tusharkantidasofficial@gmail.com";
   const header = { alg: "RS256", typ: "JWT" };
-  const claims = {
+  const claims: Record<string, unknown> = {
     iss: clientEmail,
-    scope: "https://www.googleapis.com/auth/drive",
+    scope: "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.file",
     aud: "https://oauth2.googleapis.com/token",
     exp: now + 3600,
     iat: now,
   };
+  if (delegatedUser) {
+    claims.sub = delegatedUser;
+  }
 
   const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(
     JSON.stringify(claims),
@@ -236,6 +252,16 @@ async function getOrCreateSubfolder(
   folderName: string,
   mainFolderId: string,
 ): Promise<string> {
+  // Check if explicit subfolder is configured in environment secrets
+  if (folderName === "Videos") {
+    const explicitVideosId = getEnv("GDRIVE_VIDEOS_FOLDER_ID");
+    if (explicitVideosId) return explicitVideosId;
+  }
+  if (folderName === "Chats") {
+    const explicitChatsId = getEnv("GDRIVE_CHATS_FOLDER_ID");
+    if (explicitChatsId) return explicitChatsId;
+  }
+
   const cacheKey = `${mainFolderId}:${folderName}`;
   if (folderIdCache.has(cacheKey)) {
     return folderIdCache.get(cacheKey)!;
@@ -448,6 +474,14 @@ async function uploadBinaryToDrive(
 
   if (!uploadRes.ok) {
     const errText = await uploadRes.text();
+    if (
+      uploadRes.status === 403 &&
+      (errText.includes("storageQuotaExceeded") || errText.includes("storage quota"))
+    ) {
+      throw new Error(
+        `Google Drive upload failed (403): Service Accounts do not have storage quota in 'My Drive'. To store files in Google Drive, please ensure the target 'Videos' folder is inside a Google Shared Drive with the Service Account added as 'Content Manager' or 'Contributor', or configure Domain-Wide Delegation (GDRIVE_DELEGATED_USER). Google Error: ${errText}`,
+      );
+    }
     throw new Error(`Google Drive upload failed (${uploadRes.status}): ${errText}`);
   }
 
@@ -578,7 +612,7 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
 
   try {
-    const mainFolderId = getEnv("GDRIVE_MAIN_FOLDER_ID");
+    const mainFolderId = getEnv("GDRIVE_MAIN_FOLDER_ID") || DEFAULT_MAIN_FOLDER_ID;
     if (!mainFolderId) {
       throw new Error("GDRIVE_MAIN_FOLDER_ID is not configured in Supabase secrets.");
     }
@@ -757,13 +791,14 @@ Deno.serve(async (req: Request) => {
         const file = formData.get("file") as File | null;
         if (!file) throw new Error("No 'file' field found in multipart formData.");
 
+        const explicitFolderId =
+          (formData.get("folderId") as string | null) ||
+          (formData.get("targetFolderId") as string | null);
         const customFolder = formData.get("folder") as string | null;
         const targetSubfolder = customFolder || determineTargetSubfolder(file.type, file.name);
-        const targetFolderId = await getOrCreateSubfolder(
-          accessToken,
-          targetSubfolder,
-          mainFolderId,
-        );
+        const targetFolderId =
+          explicitFolderId ||
+          (await getOrCreateSubfolder(accessToken, targetSubfolder, mainFolderId));
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = new Uint8Array(arrayBuffer);
