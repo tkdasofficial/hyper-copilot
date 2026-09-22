@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 const GITHUB_REPO_OWNER = "TKDasOfficial";
-const GITHUB_REPO_NAME = "video-agent";
+const GITHUB_REPO_NAME = Deno.env.get("GITHUB_REPO_NAME") || "hyper-copilot-runtime";
 const GITHUB_DISPATCH_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`;
 
 function captionSizeToken(captionStyle: string): "small" | "medium" | "large" {
@@ -35,33 +35,47 @@ function buildClientPayload(params: {
   userId: string;
   prompt: string;
   negativePrompt?: string | null;
+  category?: string | null;
+  visualStyle?: string | null;
+  resolution?: string | null;
+  fps?: string | null;
   voiceGender?: string | null;
   voicePersona?: string | null;
   imageStyle?: string | null;
   aspectRatio?: string | null;
   durationSeconds: number;
+  bgm?: boolean | null;
   captions?: boolean | null;
   captionStyle?: string | null;
   captionScale?: number | null;
+  captionSize?: string | null;
   isLong: boolean;
 }): Record<string, string> {
+  const isBgm = params.bgm !== false;
+  const durMins = Math.max(1, Math.round(params.durationSeconds / 60));
+
   const base: Record<string, string> = {
     video_id: params.videoId,
     user_id: params.userId,
     prompt: params.prompt || "",
     negative_prompt: params.negativePrompt ?? "",
-    voice_gender: params.voiceGender ?? "male",
-    image_style: params.imageStyle ?? "Cinematic 3D",
-    aspect_ratio: params.aspectRatio || (params.isLong ? "16:9" : "9:16"),
+    category: params.category || params.voicePersona || "Documentary",
+    visual_style: params.visualStyle || params.imageStyle || "Cinematic",
+    resolution: params.resolution || "1080p",
+    fps: params.fps || "60",
+    duration_minutes: String(durMins),
     duration_seconds: String(params.durationSeconds),
-    captions: params.captions ? captionSizeToken(params.captionStyle ?? "") : "false",
+    voice_gender: params.voiceGender ?? "male",
+    bgm: isBgm ? "true" : "false",
+    captions: params.captions ? "true" : "false",
+    caption_style: params.captionStyle || "Dynamic",
+    caption_size: params.captionSize || captionSizeToken(params.captionStyle ?? ""),
+    aspect_ratio: params.aspectRatio || (params.isLong ? "16:9" : "9:16"),
+    // Backward compatibility aliases
+    voice_persona: params.category || params.voicePersona || "Documentary",
+    image_style: params.visualStyle || params.imageStyle || "Cinematic",
+    caption_scale: String(params.captionScale ?? 4),
   };
-
-  if (params.isLong) {
-    base.voice_persona = params.voicePersona ?? "Cosmic Documentary";
-  } else {
-    base.caption_scale = String(params.captionScale ?? 4);
-  }
 
   return base;
 }
@@ -208,11 +222,16 @@ Deno.serve(async (req: Request) => {
         userId: video.user_id,
         prompt: video.prompt,
         negativePrompt: video.negative_prompt,
+        category: video.voice_persona,
+        visualStyle: video.image_style,
+        resolution: video.quality,
+        fps: video.bitrate?.includes("30") ? "30" : "60",
         voiceGender: video.voice_gender,
         voicePersona: video.voice_persona,
         imageStyle: video.image_style,
         aspectRatio: video.aspect_ratio || (isLong ? "16:9" : "9:16"),
         durationSeconds: durSec,
+        bgm: video.motion_template !== "bgm_off",
         captions: video.captions,
         captionStyle: video.caption_style,
         captionScale: video.caption_scale,
@@ -332,11 +351,16 @@ Deno.serve(async (req: Request) => {
           userId,
           prompt,
           negativePrompt: videoConfig.negative_prompt,
+          category: videoConfig.voice_persona,
+          visualStyle: videoConfig.image_style,
+          resolution: videoConfig.quality,
+          fps: videoConfig.bitrate?.includes("30") ? "30" : "60",
           voiceGender: videoConfig.voice_gender,
           voicePersona: videoConfig.voice_persona,
           imageStyle: videoConfig.image_style,
           aspectRatio: videoConfig.aspect_ratio,
           durationSeconds,
+          bgm: videoConfig.motion_template !== "bgm_off",
           captions: videoConfig.captions,
           captionStyle: videoConfig.caption_style,
           captionScale: videoConfig.caption_scale,

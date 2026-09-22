@@ -5,26 +5,32 @@ import { visualStylePrompt } from "@/lib/style-presets";
 export type VideoAgentConfig = {
   mode?: "short" | "long";
   prompt: string;
-  negative_prompt: string;
-  voice_gender: string;
-  voice_persona: string;
-  voice_speed: number;
-  voice_pitch: number;
-  image_style: string;
-  motion_template: string;
-  captions: boolean;
-  caption_style: string;
-  caption_scale: number;
-  aspect_ratio: string;
-  quality: string;
-  bitrate: string;
-  duration_seconds: number;
+  negative_prompt?: string;
+  category?: string;
+  visual_style?: string;
+  resolution?: string;
+  fps?: string;
+  bgm?: boolean;
+  captions?: boolean;
+  caption_style?: string;
+  caption_size?: string;
+  voice_gender?: string;
+  voice_persona?: string;
+  voice_speed?: number;
+  voice_pitch?: number;
+  image_style?: string;
+  motion_template?: string;
+  caption_scale?: number;
+  aspect_ratio?: string;
+  quality?: string;
+  bitrate?: string;
+  duration_seconds?: number;
   duration_minutes?: number;
 };
 
 function validate(input: VideoAgentConfig): VideoAgentConfig {
   if (!input || typeof input.prompt !== "string" || !input.prompt.trim()) {
-    throw new Error("A prompt is required");
+    throw new Error("A prompt or documentary idea is required");
   }
   const isLong =
     input.mode === "long" || input.aspect_ratio === "16:9" || Number(input.duration_seconds) > 60;
@@ -32,38 +38,47 @@ function validate(input: VideoAgentConfig): VideoAgentConfig {
   const rawDuration = Math.round(
     Number(
       input.duration_seconds ??
-        (input.duration_minutes ? Number(input.duration_minutes) * 60 : isLong ? 300 : 15),
+        (input.duration_minutes ? Number(input.duration_minutes) * 60 : isLong ? 180 : 15),
     ),
   );
-  const scale = Math.round(Number(input.caption_scale ?? 4));
+  const scale =
+    input.caption_size === "Small"
+      ? 2
+      : input.caption_size === "Large"
+        ? 6
+        : Math.round(Number(input.caption_scale ?? 4));
 
   return {
     mode: isLong ? "long" : "short",
     duration_seconds: Math.min(
       maxDuration,
-      Math.max(1, Number.isFinite(rawDuration) ? rawDuration : 15),
+      Math.max(1, Number.isFinite(rawDuration) ? rawDuration : isLong ? 180 : 15),
     ),
     duration_minutes: input.duration_minutes
       ? Math.min(15, Math.max(1, Math.round(input.duration_minutes)))
-      : undefined,
+      : Math.round(rawDuration / 60),
     prompt: input.prompt.trim().slice(0, 4000),
     negative_prompt: String(input.negative_prompt ?? "").slice(0, 2000),
+    category: input.category || input.voice_persona || "Documentary",
+    visual_style: input.visual_style || input.image_style || "Cinematic",
+    resolution: input.resolution || input.quality || "1080p",
+    fps: input.fps || (input.bitrate?.includes("30") ? "30" : "60"),
+    bgm: input.bgm !== false && input.motion_template !== "bgm_off",
     voice_gender: String(input.voice_gender ?? "male").toLowerCase(),
     voice_persona: String(
-      input.voice_persona ?? (isLong ? "Cosmic Documentary" : "Cinematic Narrator"),
+      input.category ?? input.voice_persona ?? (isLong ? "Documentary" : "Cinematic Narrator"),
     ),
     voice_speed: Number(input.voice_speed ?? 110),
     voice_pitch: Number(input.voice_pitch ?? 52),
-    image_style: String(
-      input.image_style ?? visualStylePrompt("Photorealistic", "Natural Sunlight"),
-    ),
-    motion_template: String(input.motion_template ?? "Auto Zoom-In"),
+    image_style: String(input.visual_style ?? input.image_style ?? "Cinematic"),
+    motion_template: input.bgm === false ? "bgm_off" : String(input.motion_template ?? "bgm_on"),
     captions: Boolean(input.captions),
-    caption_style: String(input.caption_style ?? "Neon Glow"),
+    caption_style: String(input.caption_style ?? "Dynamic"),
     caption_scale: Math.min(10, Math.max(1, Number.isFinite(scale) ? scale : 4)),
+    caption_size: input.caption_size || (scale <= 2 ? "Small" : scale <= 4 ? "Medium" : "Large"),
     aspect_ratio: input.aspect_ratio === "16:9" || isLong ? "16:9" : "9:16",
-    quality: input.quality === "720p" ? "720p" : "1080p",
-    bitrate: input.bitrate === "Standard" ? "Standard" : "High",
+    quality: input.resolution === "720p" || input.quality === "720p" ? "720p" : "1080p",
+    bitrate: input.fps ? `${input.fps} FPS` : (input.bitrate ?? "60 FPS"),
   };
 }
 

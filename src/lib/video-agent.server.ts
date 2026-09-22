@@ -20,20 +20,26 @@ import type { Database } from "@/integrations/supabase/types";
 export type VideoRenderConfig = {
   prompt: string;
   negative_prompt?: string;
+  category?: string;
+  visual_style?: string;
+  resolution?: string;
+  fps?: string;
+  duration_minutes?: number;
+  duration_seconds?: number;
   voice_gender?: string;
+  bgm?: boolean;
+  captions?: boolean;
+  caption_style?: string;
+  caption_size?: string;
   voice_persona?: string;
   voice_speed?: number;
   voice_pitch?: number;
   image_style?: string;
   motion_template?: string;
-  captions?: boolean;
-  caption_style?: string;
   caption_scale?: number;
   aspect_ratio?: string;
   quality?: string;
   bitrate?: string;
-  duration_seconds?: number;
-  duration_minutes?: number;
   mode?: string;
 };
 
@@ -115,25 +121,35 @@ async function invokeRenderDispatch(
                 ? "medium"
                 : "small";
 
+            const isBgm = v.motion_template !== "bgm_off";
+            const durSecVal = Number(v.duration_seconds || (isLong ? 300 : 15));
+            const durMinsVal = Math.max(1, Math.round(durSecVal / 60));
+
             const directPayload: Record<string, string> = {
               video_id: v.id,
               user_id: v.user_id,
               prompt: v.prompt || "",
               negative_prompt: v.negative_prompt ?? "",
+              category: v.voice_persona ?? "Documentary",
+              visual_style: v.image_style ?? "Cinematic",
+              resolution: v.quality ?? "1080p",
+              fps: v.bitrate?.includes("30") ? "30" : "60",
+              duration_minutes: String(durMinsVal),
+              duration_seconds: String(durSecVal),
               voice_gender: v.voice_gender ?? "male",
-              image_style: v.image_style ?? "Cinematic 3D",
+              bgm: isBgm ? "true" : "false",
+              captions: v.captions ? "true" : "false",
+              caption_style: v.caption_style ?? "Dynamic",
+              caption_size: captionSize,
               aspect_ratio: v.aspect_ratio || (isLong ? "16:9" : "9:16"),
-              duration_seconds: String(v.duration_seconds || (isLong ? 300 : 15)),
-              captions: v.captions ? captionSize : "false",
+              // Backward compatibility aliases
+              voice_persona: v.voice_persona ?? "Documentary",
+              image_style: v.image_style ?? "Cinematic",
+              caption_scale: String(v.caption_scale ?? 4),
             };
-            if (isLong) {
-              directPayload.voice_persona = v.voice_persona ?? "Cosmic Documentary";
-            } else {
-              directPayload.caption_scale = String(v.caption_scale ?? 4);
-            }
 
             const ghRes = await fetch(
-              "https://api.github.com/repos/TKDasOfficial/video-agent/dispatches",
+              "https://api.github.com/repos/TKDasOfficial/hyper-copilot-runtime/dispatches",
               {
                 method: "POST",
                 headers: {
@@ -224,7 +240,19 @@ export async function createVideoRequest(
   // Calculate duration_seconds safely if duration_minutes was provided
   const durationSeconds =
     Number(data.duration_seconds) ||
-    (data.duration_minutes ? Math.round(Number(data.duration_minutes) * 60) : 15);
+    (data.duration_minutes
+      ? Math.round(Number(data.duration_minutes) * 60)
+      : data.mode === "short"
+        ? 15
+        : 180);
+
+  // Determine scale number from caption_size
+  const captionScaleNum =
+    data.caption_size === "Small"
+      ? 2
+      : data.caption_size === "Large"
+        ? 6
+        : Number(data.caption_scale) || 4;
 
   // Explicitly construct payload with ONLY existing database columns on public.videos
   // to prevent PostgREST PGRST204 ("Could not find column in schema cache") errors
@@ -233,17 +261,17 @@ export async function createVideoRequest(
     prompt: data.prompt,
     negative_prompt: data.negative_prompt ?? "",
     voice_gender: data.voice_gender ?? "male",
-    voice_persona: data.voice_persona ?? "Cinematic Narrator",
+    voice_persona: data.category ?? data.voice_persona ?? "Documentary",
     voice_speed: Number(data.voice_speed) || 110,
     voice_pitch: Number(data.voice_pitch) || 52,
-    image_style: data.image_style ?? "Cinematic 3D",
-    motion_template: data.motion_template ?? "Auto Zoom-In",
+    image_style: data.visual_style ?? data.image_style ?? "Cinematic",
+    motion_template: data.bgm === false ? "bgm_off" : (data.motion_template ?? "bgm_on"),
     captions: Boolean(data.captions),
-    caption_style: data.caption_style ?? "Neon Glow",
-    caption_scale: Number(data.caption_scale) || 4,
-    aspect_ratio: data.aspect_ratio ?? "9:16",
-    quality: data.quality ?? "1080p",
-    bitrate: data.bitrate ?? "High",
+    caption_style: data.caption_style ?? "Dynamic",
+    caption_scale: captionScaleNum,
+    aspect_ratio: data.aspect_ratio ?? (data.mode === "short" ? "9:16" : "16:9"),
+    quality: data.resolution ?? data.quality ?? "1080p",
+    bitrate: data.fps ? `${data.fps} FPS` : (data.bitrate ?? "60 FPS"),
     duration_seconds: durationSeconds,
     status: "pending" as const,
     step: RENDER_STEP_QUEUED,

@@ -32,6 +32,8 @@
     "noUncheckedSideEffectImports": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@hyper-vision/web-sdk": ["./src/lib/web-sdk/index.ts"],
+      "@hyper-vision/web-sdk/*": ["./src/lib/web-sdk/*"],
       "config": ["./supabase/config/config.ts"],
       "@/config": ["./src/config.ts"],
       "supabase-config": ["./supabase/config/config.ts"]
