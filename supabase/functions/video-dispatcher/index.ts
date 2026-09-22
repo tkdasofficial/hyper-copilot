@@ -12,11 +12,19 @@ const GITHUB_REPO_OWNER = "TKDasOfficial";
 const GITHUB_REPO_NAME = Deno.env.get("GITHUB_REPO_NAME") || "hyper-copilot-runtime";
 const GITHUB_DISPATCH_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`;
 
-function captionSizeToken(captionStyle: string): "small" | "medium" | "large" {
+function captionSizeToken(
+  captionStyle: string,
+  captionScale?: number | null,
+): "small" | "medium" | "large" {
+  if (typeof captionScale === "number") {
+    if (captionScale >= 5) return "large";
+    if (captionScale <= 2) return "small";
+    return "medium";
+  }
   const value = (captionStyle ?? "").toLowerCase();
   if (value.includes("large")) return "large";
-  if (value.includes("medium")) return "medium";
-  return "small";
+  if (value.includes("small")) return "small";
+  return "medium";
 }
 
 /**
@@ -51,33 +59,23 @@ function buildClientPayload(params: {
   captionSize?: string | null;
   isLong: boolean;
 }): Record<string, string> {
-  const isBgm = params.bgm !== false;
-  const durMins = Math.max(1, Math.round(params.durationSeconds / 60));
-
-  const base: Record<string, string> = {
+  // GitHub repository dispatch strictly enforces <= 10 top-level properties.
+  // Exactly 9 or 10 keys:
+  return {
     video_id: params.videoId,
     user_id: params.userId,
     prompt: params.prompt || "",
     negative_prompt: params.negativePrompt ?? "",
-    category: params.category || params.voicePersona || "Documentary",
-    visual_style: params.visualStyle || params.imageStyle || "Cinematic",
-    resolution: params.resolution || "1080p",
-    fps: params.fps || "60",
-    duration_minutes: String(durMins),
-    duration_seconds: String(params.durationSeconds),
     voice_gender: params.voiceGender ?? "male",
-    bgm: isBgm ? "true" : "false",
-    captions: params.captions ? "true" : "false",
-    caption_style: params.captionStyle || "Dynamic",
-    caption_size: params.captionSize || captionSizeToken(params.captionStyle ?? ""),
-    aspect_ratio: params.aspectRatio || (params.isLong ? "16:9" : "9:16"),
-    // Backward compatibility aliases
-    voice_persona: params.category || params.voicePersona || "Documentary",
+    voice_persona:
+      params.category ||
+      params.voicePersona ||
+      (params.isLong ? "Documentary" : "Dynamic Storyteller"),
     image_style: params.visualStyle || params.imageStyle || "Cinematic",
-    caption_scale: String(params.captionScale ?? 4),
+    aspect_ratio: params.aspectRatio || (params.isLong ? "16:9" : "9:16"),
+    duration_seconds: String(params.durationSeconds),
+    captions: params.captions !== false ? "true" : "false",
   };
-
-  return base;
 }
 
 // Backend-only / authenticated user access guard
@@ -214,7 +212,7 @@ Deno.serve(async (req: Request) => {
           video.voice_persona.toLowerCase().includes("documentary"));
 
       const requestedMode: "short" | "long" = isLong ? "long" : "short";
-      const eventType = isLong ? "long_form" : "short_form";
+      const eventType = isLong ? "create_video" : "create_reel";
       const durSec = Number(video.duration_seconds) || (isLong ? 300 : 15);
 
       const clientPayload = buildClientPayload({
@@ -301,7 +299,7 @@ Deno.serve(async (req: Request) => {
         body.voice_persona.toLowerCase().includes("documentary"));
 
     const requestedModeB: "short" | "long" = isLongB ? "long" : "short";
-    const eventTypeB = isLongB ? "long_form" : "short_form";
+    const eventTypeB = isLongB ? "create_video" : "create_reel";
 
     const durationSeconds =
       Number(body.duration_seconds) || (isLongB ? (Number(body.duration_minutes) || 5) * 60 : 15);

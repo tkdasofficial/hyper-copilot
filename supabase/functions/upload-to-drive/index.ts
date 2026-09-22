@@ -104,7 +104,7 @@ function base64UrlEncode(data: string | Uint8Array): string {
 }
 
 /**
- * Generate OAuth2 Access Token using Google Service Account JWT (RS256)
+ * Generate OAuth2 Access Token using User Refresh Token or Google Service Account JWT (RS256)
  */
 async function getGoogleDriveAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
@@ -112,6 +112,50 @@ async function getGoogleDriveAccessToken(): Promise<string> {
   // Return cached token if valid for at least 2 more minutes
   if (cachedAccessToken && cachedAccessToken.expiresAt > now + 120) {
     return cachedAccessToken.token;
+  }
+
+  // 1. Check for User OAuth Refresh Token (bypasses Service Account 0 quota restrictions)
+  const refreshToken = getEnv("GOOGLE_REFRESH_TOKEN") || getEnv("GDRIVE_REFRESH_TOKEN");
+  const clientId =
+    getEnv("GOOGLE_CLIENT_ID") || getEnv("GOOGLE_CLOUD_API_ID") || getEnv("GDRIVE_CLIENT_ID");
+  const clientSecret =
+    getEnv("GOOGLE_CLIENT_SECRET") ||
+    getEnv("GOOGLE_CLOUD_API_SECRET") ||
+    getEnv("GDRIVE_CLIENT_SECRET");
+
+  if (refreshToken && clientId && clientSecret) {
+    try {
+      const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: refreshToken,
+          grant_type: "refresh_token",
+        }),
+      });
+
+      if (refreshRes.ok) {
+        const refreshData = (await refreshRes.json()) as {
+          access_token: string;
+          expires_in: number;
+        };
+        if (refreshData.access_token) {
+          cachedAccessToken = {
+            token: refreshData.access_token,
+            expiresAt: now + (refreshData.expires_in || 3600),
+          };
+          return cachedAccessToken.token;
+        }
+      } else {
+        console.warn(
+          `User OAuth token refresh rejected (${refreshRes.status}), falling back to Service Account.`,
+        );
+      }
+    } catch (err) {
+      console.warn("Exception during user OAuth refresh token exchange:", err);
+    }
   }
 
   let clientEmail = (getEnv("GDRIVE_CLIENT_EMAIL") || getEnv("GOOGLE_CLIENT_EMAIL") || "")

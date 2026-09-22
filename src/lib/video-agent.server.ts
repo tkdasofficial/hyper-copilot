@@ -115,15 +115,18 @@ async function invokeRenderDispatch(
               (typeof v.voice_persona === "string" &&
                 v.voice_persona.toLowerCase().includes("documentary"));
             const eventType = isLong ? "long_form" : "short_form";
-            const captionSize = (v.caption_style ?? "").toLowerCase().includes("large")
-              ? "large"
-              : (v.caption_style ?? "").toLowerCase().includes("medium")
-                ? "medium"
-                : "small";
 
             const isBgm = v.motion_template !== "bgm_off";
             const durSecVal = Number(v.duration_seconds || (isLong ? 300 : 15));
             const durMinsVal = Math.max(1, Math.round(durSecVal / 60));
+
+            const captionScaleNum = Number(v.caption_scale ?? 4);
+            const captionSize =
+              captionScaleNum >= 5 || (v.caption_style ?? "").toLowerCase().includes("large")
+                ? "Large"
+                : captionScaleNum <= 2 || (v.caption_style ?? "").toLowerCase().includes("small")
+                  ? "Small"
+                  : "Medium";
 
             const directPayload: Record<string, string> = {
               video_id: v.id,
@@ -145,7 +148,7 @@ async function invokeRenderDispatch(
               // Backward compatibility aliases
               voice_persona: v.voice_persona ?? "Documentary",
               image_style: v.image_style ?? "Cinematic",
-              caption_scale: String(v.caption_scale ?? 4),
+              caption_scale: String(captionScaleNum),
             };
 
             const ghRes = await fetch(

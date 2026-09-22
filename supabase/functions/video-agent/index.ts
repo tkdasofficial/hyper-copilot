@@ -13,11 +13,19 @@ const GITHUB_REPO_NAME = "video-agent";
 const GITHUB_DISPATCH_EVENT = "video_agent_render";
 const GITHUB_DISPATCH_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`;
 
-function captionSizeToken(captionStyle: string): "small" | "medium" | "large" {
+function captionSizeToken(
+  captionStyle: string,
+  captionScale?: number | null,
+): "small" | "medium" | "large" {
+  if (typeof captionScale === "number") {
+    if (captionScale >= 5) return "large";
+    if (captionScale <= 2) return "small";
+    return "medium";
+  }
   const value = (captionStyle ?? "").toLowerCase();
   if (value.includes("large")) return "large";
-  if (value.includes("medium")) return "medium";
-  return "small";
+  if (value.includes("small")) return "small";
+  return "medium";
 }
 
 // --- Backend-only access guard (added by Lovable) ---
