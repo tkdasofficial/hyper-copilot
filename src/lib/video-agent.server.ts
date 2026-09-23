@@ -128,12 +128,7 @@ async function invokeRenderDispatch(
                   ? "Small"
                   : "Medium";
 
-            // Group all 19+ raw properties into nested JSON objects under 9 top-level keys (<= 10)
-            // to satisfy GitHub Repository Dispatch limit while preserving every property.
             const directPayload: Record<string, unknown> = {
-              video_id: v.id,
-              prompt: v.prompt || "",
-              mode: isLong ? "long" : "short",
               identity: {
                 video_id: v.id,
                 user_id: v.user_id,
@@ -141,38 +136,23 @@ async function invokeRenderDispatch(
               content: {
                 prompt: v.prompt || "",
                 negative_prompt: v.negative_prompt ?? "",
-                category: v.voice_persona ?? "Documentary",
-              },
-              visual: {
-                visual_style: v.image_style ?? "Cinematic",
-                image_style: v.image_style ?? "Cinematic",
-                aspect_ratio: v.aspect_ratio || (isLong ? "16:9" : "9:16"),
-                resolution: v.quality ?? "1080p",
-                quality: v.quality ?? "1080p",
-                fps: v.bitrate?.includes("30") ? "30" : "60",
-                bitrate: v.bitrate ?? "standard",
-                motion_template: v.motion_template ?? "dynamic",
-                ken_burns: "true",
-                motion_type: "dynamic",
-                transition_type: "fade",
-                transition_duration: "0.4",
-                color_grading: "true",
-                vignette: "false",
-                subtitle_gradient: "true",
-                progress_bar: isLong ? "false" : "true",
-                progress_bar_color: "white@0.85",
               },
               audio: {
                 voice_gender: v.voice_gender ?? "male",
                 voice_persona: v.voice_persona ?? "Documentary",
-                voice_speed: Number(v.voice_speed ?? 1),
-                voice_pitch: Number(v.voice_pitch ?? 0),
                 category: v.voice_persona ?? "Documentary",
                 bgm: isBgm ? "true" : "false",
               },
+              visual: {
+                image_style: v.image_style ?? "Cinematic",
+                visual_style: v.image_style ?? "Cinematic",
+                resolution: v.quality ?? "1080p",
+                fps: v.bitrate?.includes("30") ? "30" : "60",
+                aspect_ratio: v.aspect_ratio || (isLong ? "16:9" : "9:16"),
+              },
               timing: {
-                duration_seconds: String(durSecVal),
                 duration_minutes: String(durMinsVal),
+                duration_seconds: String(durSecVal),
               },
               caption: {
                 captions: v.captions ? "true" : "false",
@@ -180,6 +160,9 @@ async function invokeRenderDispatch(
                 caption_size: captionSize,
                 caption_scale: String(captionScaleNum),
               },
+              video_id: v.id,
+              user_id: v.user_id,
+              prompt: (v.prompt || "").slice(0, 200),
             };
 
             const ghRes = await fetch(

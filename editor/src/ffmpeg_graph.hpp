@@ -46,7 +46,7 @@ struct FfmpegGraphConfig {
 
     // Output Encoding
     std::string video_codec = "libx264";
-    std::string preset = "fast";
+    std::string preset = "veryfast";
     int crf = 20;
     std::string audio_codec = "aac";
     std::string audio_bitrate = "192k";

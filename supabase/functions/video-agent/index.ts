@@ -1,3 +1,4 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.48.1";
 
 const corsHeaders = {
@@ -8,8 +9,8 @@ const corsHeaders = {
 };
 
 const GITHUB_REPO_OWNER = "TKDasOfficial";
-const GITHUB_REPO_NAME = Deno.env.get("GITHUB_REPO_NAME") || "hyper-copilot-runtime";
-const GITHUB_DISPATCH_EVENT = "create_video";
+const GITHUB_REPO_NAME = "video-agent";
+const GITHUB_DISPATCH_EVENT = "video_agent_render";
 const GITHUB_DISPATCH_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`;
 
 function captionSizeToken(
@@ -150,64 +151,22 @@ Deno.serve(async (req: Request) => {
           video.voice_persona.toLowerCase().includes("documentary"));
       const eventType = isLong ? "long_form" : "short_form";
 
-      const durSec = Number(video.duration_seconds || (isLong ? 300 : 15));
-      const durMins = Math.max(1, Math.round(durSec / 60));
-      const isBgm = video.motion_template !== "bgm_off";
-      const capSize = captionSizeToken(video.caption_style);
-      const capScale = String(video.caption_scale ?? 4);
-
-      // Group all 19+ raw properties into nested JSON objects under 9 top-level keys (limit <= 10)
-      const payload: Record<string, unknown> = {
+      const payload: Record<string, string> = {
         video_id: video.id,
+        user_id: video.user_id,
         prompt: video.prompt || "",
-        mode: isLong ? "long" : "short",
-        identity: {
-          video_id: video.id,
-          user_id: video.user_id,
-        },
-        content: {
-          prompt: video.prompt || "",
-          negative_prompt: video.negative_prompt ?? "",
-          category: video.voice_persona ?? "Documentary",
-        },
-        visual: {
-          visual_style: video.image_style ?? "Cinematic 3D",
-          image_style: video.image_style ?? "Cinematic 3D",
-          aspect_ratio: video.aspect_ratio || (isLong ? "16:9" : "9:16"),
-          resolution: video.quality ?? "1080p",
-          quality: video.quality ?? "1080p",
-          fps: video.bitrate?.includes("30") ? "30" : "60",
-          bitrate: video.bitrate ?? "standard",
-          motion_template: video.motion_template ?? "dynamic",
-          motion_type: "dynamic",
-          ken_burns: "true",
-          transition_type: "fade",
-          transition_duration: "0.4",
-          color_grading: "true",
-          vignette: "false",
-          subtitle_gradient: "true",
-          progress_bar: isLong ? "false" : "true",
-          progress_bar_color: "white@0.85",
-        },
-        audio: {
-          voice_gender: video.voice_gender ?? "male",
-          voice_persona: video.voice_persona ?? (isLong ? "Cosmic Documentary" : "casual"),
-          voice_speed: Number(video.voice_speed ?? 1),
-          voice_pitch: Number(video.voice_pitch ?? 0),
-          category: video.voice_persona ?? "Documentary",
-          bgm: isBgm ? "true" : "false",
-        },
-        timing: {
-          duration_seconds: String(durSec),
-          duration_minutes: String(durMins),
-        },
-        caption: {
-          captions: video.captions ? "true" : "false",
-          caption_style: video.caption_style ?? "Dynamic",
-          caption_size: capSize,
-          caption_scale: capScale,
-        },
+        negative_prompt: video.negative_prompt ?? "",
+        voice_gender: video.voice_gender ?? "male",
+        image_style: video.image_style ?? "Cinematic 3D",
+        aspect_ratio: video.aspect_ratio || (isLong ? "16:9" : "9:16"),
+        duration_seconds: String(video.duration_seconds || (isLong ? 300 : 15)),
+        captions: video.captions ? captionSizeToken(video.caption_style) : "false",
       };
+      if (isLong) {
+        payload.voice_persona = video.voice_persona ?? "Cosmic Documentary";
+      } else {
+        payload.caption_scale = String(video.caption_scale ?? 4);
+      }
 
       // Dispatch to GitHub Video Engine
       const res = await fetch(GITHUB_DISPATCH_URL, {
@@ -306,63 +265,22 @@ Deno.serve(async (req: Request) => {
             videoConfig.voice_persona.toLowerCase().includes("documentary"));
         const eventTypeB = isLongB ? "long_form" : "short_form";
 
-        const durSecB = Number(videoConfig.duration_seconds || (isLongB ? 300 : 15));
-        const durMinsB = Math.max(1, Math.round(durSecB / 60));
-        const isBgmB = videoConfig.motion_template !== "bgm_off";
-        const capSizeB = captionSizeToken(videoConfig.caption_style);
-        const capScaleB = String(videoConfig.caption_scale ?? 4);
-
-        const payloadB: Record<string, unknown> = {
+        const payloadB: Record<string, string> = {
           video_id: newVideoId,
+          user_id: userId,
           prompt: videoConfig.prompt,
-          mode: isLongB ? "long" : "short",
-          identity: {
-            video_id: newVideoId,
-            user_id: userId,
-          },
-          content: {
-            prompt: videoConfig.prompt,
-            negative_prompt: videoConfig.negative_prompt,
-            category: videoConfig.voice_persona ?? "Documentary",
-          },
-          visual: {
-            visual_style: videoConfig.image_style,
-            image_style: videoConfig.image_style,
-            aspect_ratio: videoConfig.aspect_ratio,
-            resolution: videoConfig.quality,
-            quality: videoConfig.quality,
-            fps: videoConfig.bitrate?.includes("30") ? "30" : "60",
-            bitrate: videoConfig.bitrate,
-            motion_template: videoConfig.motion_template,
-            motion_type: "dynamic",
-            ken_burns: "true",
-            transition_type: "fade",
-            transition_duration: "0.4",
-            color_grading: "true",
-            vignette: "false",
-            subtitle_gradient: "true",
-            progress_bar: isLongB ? "false" : "true",
-            progress_bar_color: "white@0.85",
-          },
-          audio: {
-            voice_gender: videoConfig.voice_gender,
-            voice_persona: videoConfig.voice_persona,
-            voice_speed: Number(videoConfig.voice_speed ?? 1),
-            voice_pitch: Number(videoConfig.voice_pitch ?? 0),
-            category: videoConfig.voice_persona,
-            bgm: isBgmB ? "true" : "false",
-          },
-          timing: {
-            duration_seconds: String(durSecB),
-            duration_minutes: String(durMinsB),
-          },
-          caption: {
-            captions: videoConfig.captions ? "true" : "false",
-            caption_style: videoConfig.caption_style,
-            caption_size: capSizeB,
-            caption_scale: capScaleB,
-          },
+          negative_prompt: videoConfig.negative_prompt,
+          voice_gender: videoConfig.voice_gender,
+          image_style: videoConfig.image_style,
+          aspect_ratio: videoConfig.aspect_ratio,
+          duration_seconds: String(videoConfig.duration_seconds),
+          captions: videoConfig.captions ? captionSizeToken(videoConfig.caption_style) : "false",
         };
+        if (isLongB) {
+          payloadB.voice_persona = videoConfig.voice_persona;
+        } else {
+          payloadB.caption_scale = String(videoConfig.caption_scale ?? 4);
+        }
 
         const ghRes = await fetch(GITHUB_DISPATCH_URL, {
           method: "POST",

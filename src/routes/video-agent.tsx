@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Download, ExternalLink, Loader2, Film } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import {
+  Download,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  Terminal,
+} from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { StudioLayout } from "@/components/hyper/StudioLayout";
@@ -9,8 +18,10 @@ import { RecentCreations } from "@/components/hyper/RecentCreations";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/config";
 import { getVideoPlaybackUrl, startVideoRender } from "@/lib/video-agent.functions";
+import { cn } from "@/lib/utils";
 import { Panel, Segment, SliderRow, SwitchRow, TextRow } from "@/components/hyper/StudioControls";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 export const Route = createFileRoute("/video-agent")({
   head: () =>
@@ -50,8 +61,46 @@ const VOICE_GENDERS = ["Male", "Female"] as const;
 const CAPTION_STYLES = ["Minimal", "Bold", "Dynamic"] as const;
 const CAPTION_SIZES = ["Small", "Medium", "Large"] as const;
 const MODES = ["Long-form", "Short-form"] as const;
+const STAGES = [
+  { stage: 1, label: "Scripting" },
+  { stage: 2, label: "Voiceover" },
+  { stage: 3, label: "Render" },
+  { stage: 4, label: "Complete" },
+] as const;
 
 type LogLine = { time: string; text: string; tone?: "ok" | "warn" | "err" };
+
+function Console({ lines }: { lines: LogLine[] }) {
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [lines.length]);
+
+  return (
+    <div className="max-h-48 overflow-y-auto rounded-xl bg-surface-2/50 p-3 font-mono text-[11px] leading-relaxed border border-border/60">
+      {lines.map((l, i) => (
+        <p
+          key={i}
+          className={cn(
+            "whitespace-pre-wrap",
+            l.tone === "err"
+              ? "text-destructive"
+              : l.tone === "ok"
+                ? "text-emerald-400"
+                : l.tone === "warn"
+                  ? "text-amber-400/90"
+                  : "text-foreground/80",
+          )}
+        >
+          <span className="text-muted-foreground/60">[{l.time}] </span>
+          {l.text}
+        </p>
+      ))}
+      <div ref={endRef} />
+    </div>
+  );
+}
 
 function VideoAgent() {
   const [mode, setMode] = useState<"short" | "long">("long");
@@ -94,6 +143,30 @@ function VideoAgent() {
     const time = new Date().toLocaleTimeString("en-GB", { hour12: false });
     setLines((l) => [...l, tone ? { time, text, tone } : { time, text }]);
   }, []);
+
+  const getActiveStage = (): number => {
+    if (status === "completed" || progress === 100) return 4;
+    const s = step.toLowerCase();
+    if (s.includes("script") || s.includes("queued") || s.includes("prompt")) return 1;
+    if (s.includes("voice") || s.includes("tts") || s.includes("speech") || s.includes("audio"))
+      return 2;
+    if (
+      s.includes("render") ||
+      s.includes("engine") ||
+      s.includes("c++") ||
+      s.includes("asset") ||
+      s.includes("source")
+    )
+      return 3;
+    if (
+      s.includes("download") ||
+      s.includes("complete") ||
+      s.includes("finish") ||
+      s.includes("export")
+    )
+      return 4;
+    return progress > 60 ? 3 : progress > 30 ? 2 : 1;
+  };
 
   useEffect(() => {
     if (!videoId) return;
@@ -250,8 +323,6 @@ function VideoAgent() {
 
       setStatus("processing");
       setVideoId(id);
-      setBusy(false);
-      toast.success("Job started! Video is generating and will be saved in your Library.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start generation";
       log(msg, "err");
@@ -260,6 +331,8 @@ function VideoAgent() {
       setBusy(false);
     }
   };
+
+  const activeStage = getActiveStage();
 
   return (
     <StudioLayout>
@@ -385,26 +458,88 @@ function VideoAgent() {
           onClick={() => void handleGenerateVideo()}
           className="h-11 w-full rounded-full text-[14px] font-bold"
         >
-          {busy ? (
-            <span className="flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Starting job…
-            </span>
-          ) : (
-            "Generate Video"
-          )}
+          {busy ? `Generating… ${progress}%` : "Generate"}
         </Button>
 
-        <div className="flex items-center justify-between px-1 text-[12px] text-muted-foreground">
-          <span>Videos are saved to your Library once rendered</span>
-          <Link
-            to="/library"
-            className="flex items-center gap-1 font-semibold text-foreground hover:underline"
-          >
-            <Film className="h-3.5 w-3.5 text-primary" />
-            Go to Library →
-          </Link>
-        </div>
+        {busy || status || lines.length > 0 ? (
+          <div className="space-y-3.5 rounded-2xl border border-border bg-surface/50 p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[13px] font-bold tracking-tight">Render status</p>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase",
+                  status === "completed"
+                    ? "bg-emerald-500/15 text-emerald-400"
+                    : status === "failed"
+                      ? "bg-destructive/15 text-destructive"
+                      : "bg-foreground/10 text-foreground",
+                )}
+              >
+                {status ?? "Queued"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5">
+              {STAGES.map((s) => {
+                const isPassed = activeStage > s.stage || status === "completed";
+                const isCurrent = activeStage === s.stage && status !== "completed";
+                return (
+                  <div
+                    key={s.stage}
+                    className={cn(
+                      "flex items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[11px] font-semibold",
+                      isPassed
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                        : isCurrent
+                          ? "border-border-strong bg-background text-foreground"
+                          : "border-border bg-background text-muted-foreground/60",
+                    )}
+                  >
+                    {isPassed ? (
+                      <CheckCircle2 className="h-3 w-3 shrink-0" />
+                    ) : isCurrent ? (
+                      <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                    ) : (
+                      <Clock className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="truncate">{s.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[11.5px] text-muted-foreground">
+                <span className="truncate">{step}</span>
+                <span className="font-bold tabular-nums">{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-1.5 rounded-full" />
+            </div>
+
+            <div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowLogs(!showLogs)}
+                className="h-7 px-1.5 text-[11.5px] text-muted-foreground hover:text-foreground"
+              >
+                <Terminal className="h-3.5 w-3.5" />
+                <span>{showLogs ? "Hide logs" : "View logs"}</span>
+                {showLogs ? (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+              </Button>
+              {showLogs ? (
+                <div className="pt-2">
+                  <Console lines={lines} />
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {clipUrl ? (
           <div className="space-y-2.5">

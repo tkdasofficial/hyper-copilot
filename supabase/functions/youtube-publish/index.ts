@@ -41,16 +41,8 @@ async function authorized(req: Request): Promise<boolean> {
 }
 
 function credentials() {
-  const clientId = (
-    Deno.env.get("GOOGLE_CLIENT_ID") ??
-    Deno.env.get("GOOGLE_CLOUD_API_ID") ??
-    ""
-  ).trim();
-  const clientSecret = (
-    Deno.env.get("GOOGLE_CLIENT_SECRET") ??
-    Deno.env.get("GOOGLE_CLOUD_API_SECRET") ??
-    ""
-  ).trim();
+  const clientId = (Deno.env.get("GOOGLE_CLOUD_API_ID") ?? "").trim();
+  const clientSecret = (Deno.env.get("GOOGLE_CLOUD_API_SECRET") ?? "").trim();
   return { clientId, clientSecret };
 }
 

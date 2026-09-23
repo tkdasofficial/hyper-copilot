@@ -1,3 +1,4 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.48.1";
 
 const corsHeaders = {
@@ -29,18 +30,13 @@ function captionSizeToken(
 /**
  * GitHub repository dispatch strictly enforces a limit of NO MORE THAN 10
  * top-level properties in client_payload (POST /repos/{owner}/{repo}/dispatches returns 422 if > 10).
+ * We construct exactly 10 properties tailored to each rendering engine:
  *
- * To avoid dropping any data, all 19+ raw properties are preserved and organized
- * into nested JSON objects under 9 top-level keys:
- *   1. video_id (string)
- *   2. prompt (string)
- *   3. mode (string)
- *   4. identity: { video_id, user_id }
- *   5. content: { prompt, negative_prompt, category }
- *   6. visual: { visual_style, image_style, aspect_ratio, resolution, quality, fps, bitrate, motion_template, ... }
- *   7. audio: { voice_gender, voice_persona, voice_speed, voice_pitch, category, bgm }
- *   8. timing: { duration_seconds, duration_minutes }
- *   9. caption: { captions, caption_style, caption_size, caption_scale }
+ * Short-form (mini-editor / render.py):
+ *   video_id, user_id, prompt, negative_prompt, voice_gender, image_style, aspect_ratio, duration_seconds, captions, caption_scale
+ *
+ * Long-form (editor / HyperEditor C++ pipeline):
+ *   video_id, user_id, prompt, negative_prompt, voice_gender, voice_persona, image_style, aspect_ratio, duration_seconds, captions
  */
 function buildClientPayload(params: {
   videoId: string;
@@ -50,15 +46,10 @@ function buildClientPayload(params: {
   category?: string | null;
   visualStyle?: string | null;
   resolution?: string | null;
-  quality?: string | null;
   fps?: string | null;
-  bitrate?: string | null;
   voiceGender?: string | null;
   voicePersona?: string | null;
-  voiceSpeed?: number | null;
-  voicePitch?: number | null;
   imageStyle?: string | null;
-  motionTemplate?: string | null;
   aspectRatio?: string | null;
   durationSeconds: number;
   bgm?: boolean | null;
@@ -67,67 +58,23 @@ function buildClientPayload(params: {
   captionScale?: number | null;
   captionSize?: string | null;
   isLong: boolean;
-}): Record<string, unknown> {
-  const durSec = params.durationSeconds || (params.isLong ? 300 : 15);
-  const durMins = Math.max(1, Math.round(durSec / 60));
-  const captionScaleNum = params.captionScale ?? 4;
-  const captionSize =
-    params.captionSize || captionSizeToken(params.captionStyle ?? "", params.captionScale);
-
+}): Record<string, string> {
+  // GitHub repository dispatch strictly enforces <= 10 top-level properties.
+  // Exactly 9 or 10 keys:
   return {
     video_id: params.videoId,
+    user_id: params.userId,
     prompt: params.prompt || "",
-    mode: params.isLong ? "long" : "short",
-    identity: {
-      video_id: params.videoId,
-      user_id: params.userId,
-    },
-    content: {
-      prompt: params.prompt || "",
-      negative_prompt: params.negativePrompt ?? "",
-      category: params.category ?? "",
-    },
-    visual: {
-      visual_style: params.visualStyle || params.imageStyle || "Cinematic",
-      image_style: params.imageStyle || params.visualStyle || "Cinematic",
-      aspect_ratio: params.aspectRatio || (params.isLong ? "16:9" : "9:16"),
-      resolution: params.resolution || params.quality || "1080p",
-      quality: params.quality || params.resolution || "1080p",
-      fps: params.fps || (params.bitrate?.includes("30") ? "30" : "60"),
-      bitrate: params.bitrate || "standard",
-      motion_template: params.motionTemplate || "dynamic",
-      motion_type: "dynamic",
-      ken_burns: "true",
-      transition_type: "fade",
-      transition_duration: "0.4",
-      color_grading: "true",
-      vignette: "false",
-      subtitle_gradient: "true",
-      progress_bar: params.isLong ? "false" : "true",
-      progress_bar_color: "white@0.85",
-    },
-    audio: {
-      voice_gender: params.voiceGender ?? "male",
-      voice_persona:
-        params.voicePersona ||
-        params.category ||
-        (params.isLong ? "Cosmic Documentary" : "Dynamic Storyteller"),
-      voice_speed: Number(params.voiceSpeed ?? 1),
-      voice_pitch: Number(params.voicePitch ?? 0),
-      category:
-        params.category || params.voicePersona || (params.isLong ? "Documentary" : "Storyteller"),
-      bgm: params.bgm !== false ? "true" : "false",
-    },
-    timing: {
-      duration_seconds: String(durSec),
-      duration_minutes: String(durMins),
-    },
-    caption: {
-      captions: params.captions !== false ? "true" : "false",
-      caption_style: params.captionStyle || "Dynamic",
-      caption_size: captionSize,
-      caption_scale: String(captionScaleNum),
-    },
+    negative_prompt: params.negativePrompt ?? "",
+    voice_gender: params.voiceGender ?? "male",
+    voice_persona:
+      params.category ||
+      params.voicePersona ||
+      (params.isLong ? "Documentary" : "Dynamic Storyteller"),
+    image_style: params.visualStyle || params.imageStyle || "Cinematic",
+    aspect_ratio: params.aspectRatio || (params.isLong ? "16:9" : "9:16"),
+    duration_seconds: String(params.durationSeconds),
+    captions: params.captions !== false ? "true" : "false",
   };
 }
 
@@ -276,15 +223,10 @@ Deno.serve(async (req: Request) => {
         category: video.voice_persona,
         visualStyle: video.image_style,
         resolution: video.quality,
-        quality: video.quality,
         fps: video.bitrate?.includes("30") ? "30" : "60",
-        bitrate: video.bitrate,
         voiceGender: video.voice_gender,
         voicePersona: video.voice_persona,
-        voiceSpeed: video.voice_speed,
-        voicePitch: video.voice_pitch,
         imageStyle: video.image_style,
-        motionTemplate: video.motion_template,
         aspectRatio: video.aspect_ratio || (isLong ? "16:9" : "9:16"),
         durationSeconds: durSec,
         bgm: video.motion_template !== "bgm_off",
@@ -410,15 +352,10 @@ Deno.serve(async (req: Request) => {
           category: videoConfig.voice_persona,
           visualStyle: videoConfig.image_style,
           resolution: videoConfig.quality,
-          quality: videoConfig.quality,
           fps: videoConfig.bitrate?.includes("30") ? "30" : "60",
-          bitrate: videoConfig.bitrate,
           voiceGender: videoConfig.voice_gender,
           voicePersona: videoConfig.voice_persona,
-          voiceSpeed: videoConfig.voice_speed,
-          voicePitch: videoConfig.voice_pitch,
           imageStyle: videoConfig.image_style,
-          motionTemplate: videoConfig.motion_template,
           aspectRatio: videoConfig.aspect_ratio,
           durationSeconds,
           bgm: videoConfig.motion_template !== "bgm_off",

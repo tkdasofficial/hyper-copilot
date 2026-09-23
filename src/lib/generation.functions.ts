@@ -12,8 +12,6 @@ export type GenerationRecord = {
   url: string | null;
   error: string | null;
   createdAt: string;
-  fileId?: string | null;
-  directDownloadUrl?: string | null;
 };
 
 /** Uploads a browser file (as a data URL) so providers can read it over HTTPS. */
@@ -69,92 +67,35 @@ export const listGenerations = createServerFn({ method: "POST" })
   .inputValidator((input: { kind?: GenerationKind; limit?: number } | undefined) => input ?? {})
   .handler(async ({ data, context }): Promise<GenerationRecord[]> => {
     const storage = await import("@/lib/storage.server");
-    const limit = data.limit ?? 60;
+    let query = context.supabase
+      .from("generations")
+      .select("id, kind, model, prompt, status, error, storage_path, created_at")
+      .order("created_at", { ascending: false })
+      .limit(data.limit ?? 60);
+    if (data.kind) query = query.eq("kind", data.kind);
 
-    let generationsItems: GenerationRecord[] = [];
-    if (!data.kind || data.kind === "image" || data.kind === "audio" || data.kind === "video") {
-      let query = context.supabase
-        .from("generations")
-        .select("id, kind, model, prompt, status, error, storage_path, created_at")
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      if (data.kind) query = query.eq("kind", data.kind);
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
 
-      const { data: rows, error } = await query;
-      if (!error && rows) {
-        const paths = rows.map((r) => r.storage_path).filter((p): p is string => !!p);
-        const urls = await storage.signedUrls(storage.GENERATIONS_BUCKET, paths);
+    const paths = (rows ?? []).map((r) => r.storage_path).filter((p): p is string => !!p);
+    const urls = await storage.signedUrls(storage.GENERATIONS_BUCKET, paths);
 
-        generationsItems = rows.map((r) => ({
-          id: r.id,
-          kind: r.kind as GenerationKind,
-          model: r.model,
-          prompt: r.prompt,
-          status: r.status,
-          error: r.error,
-          createdAt: r.created_at,
-          url: r.storage_path ? (urls[r.storage_path] ?? null) : null,
-        }));
-      }
-    }
-
-    let videoItems: GenerationRecord[] = [];
-    if (!data.kind || data.kind === "video") {
-      const { data: vRows } = await context.supabase
-        .from("videos")
-        .select(
-          "id, prompt, title, image_style, quality, status, error, video_url, direct_download_url, file_id, created_at",
-        )
-        .order("created_at", { ascending: false })
-        .limit(limit);
-
-      if (vRows) {
-        videoItems = vRows.map((v) => {
-          let directUrl = v.direct_download_url || v.video_url || null;
-          if (v.file_id && (!directUrl || directUrl.includes("drive.google.com"))) {
-            directUrl = `https://drive.google.com/uc?export=download&id=${v.file_id}`;
-          }
-
-          return {
-            id: v.id,
-            kind: "video" as const,
-            model: v.image_style ? `${v.image_style} · ${v.quality || "1080p"}` : "Video Agent",
-            prompt: v.prompt || v.title || "AI Generated Video",
-            status: v.status || "completed",
-            error: v.error || null,
-            createdAt: v.created_at,
-            url: directUrl,
-            fileId: v.file_id ?? null,
-            directDownloadUrl: directUrl,
-          };
-        });
-      }
-    }
-
-    // Merge and deduplicate by ID (in case a generation and video share ID)
-    const seen = new Set<string>();
-    const combined: GenerationRecord[] = [];
-
-    for (const item of [...videoItems, ...generationsItems]) {
-      if (!seen.has(item.id)) {
-        seen.add(item.id);
-        combined.push(item);
-      }
-    }
-
-    // Sort newest first
-    combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return combined.slice(0, limit);
+    return (rows ?? []).map((r) => ({
+      id: r.id,
+      kind: r.kind as GenerationKind,
+      model: r.model,
+      prompt: r.prompt,
+      status: r.status,
+      error: r.error,
+      createdAt: r.created_at,
+      url: r.storage_path ? (urls[r.storage_path] ?? null) : null,
+    }));
   });
 
 export const deleteGeneration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
-    // Attempt deleting from videos table
-    await context.supabase.from("videos").delete().eq("id", data.id);
-
     const { invokeEdgeFunction } = await import("@/lib/edge-functions.server");
     const { error } = await invokeEdgeFunction("update-record-handler", {
       userId: context.userId,
@@ -175,9 +116,7 @@ export const deleteGeneration = createServerFn({ method: "POST" })
         .from("generations")
         .delete()
         .eq("id", data.id);
-      if (delErr) {
-        // ignore if already deleted from videos
-      }
+      if (delErr) throw new Error(delErr.message);
       if (row?.storage_path) {
         await storage.removeFiles(storage.GENERATIONS_BUCKET, [row.storage_path]);
       }

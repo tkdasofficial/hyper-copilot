@@ -280,10 +280,12 @@ std::vector<std::string> FfmpegGraph::buildCommandArgs() const {
     }
 
     // Codec & Quality settings
+    args.push_back("-threads");
+    args.push_back("2");
     args.push_back("-c:v");
     args.push_back(m_config.video_codec);
     args.push_back("-preset");
-    args.push_back(m_config.preset);
+    args.push_back(m_config.preset.empty() ? "veryfast" : m_config.preset);
     args.push_back("-crf");
     args.push_back(std::to_string(m_config.crf));
     args.push_back("-c:a");

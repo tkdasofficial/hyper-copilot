@@ -1,3 +1,5 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -83,64 +85,10 @@ async function getGoogleDriveAccessToken(): Promise<string> {
     return cachedAccessToken.token;
   }
 
-  // 1. First priority: Check for User OAuth Refresh Token
-  const refreshToken =
-    getEnv("GOOGLE_DRIVE_REFRESH_TOKEN") ||
-    getEnv("GDRIVE_REFRESH_TOKEN") ||
-    getEnv("GOOGLE_REFRESH_TOKEN");
-  const clientId =
-    getEnv("GOOGLE_CLIENT_ID") || getEnv("GOOGLE_CLOUD_API_ID") || getEnv("GDRIVE_CLIENT_ID");
-  const clientSecret =
-    getEnv("GOOGLE_CLIENT_SECRET") ||
-    getEnv("GOOGLE_CLOUD_API_SECRET") ||
-    getEnv("GDRIVE_CLIENT_SECRET");
-
-  if (refreshToken && clientId && clientSecret) {
-    try {
-      const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          refresh_token: refreshToken,
-          grant_type: "refresh_token",
-        }),
-      });
-
-      if (refreshRes.ok) {
-        const refreshData = (await refreshRes.json()) as {
-          access_token: string;
-          expires_in: number;
-        };
-        if (refreshData.access_token) {
-          cachedAccessToken = {
-            token: refreshData.access_token,
-            expiresAt: now + (refreshData.expires_in || 3600),
-          };
-          return cachedAccessToken.token;
-        }
-      }
-    } catch {
-      // fallback to service account
-    }
-  }
-
-  // 2. Service Account JWT fallback
-  let clientEmail = (
-    getEnv("GOOGLE_SERVICE_ACCOUNT_ID") ||
-    getEnv("GDRIVE_CLIENT_EMAIL") ||
-    getEnv("GOOGLE_CLIENT_EMAIL") ||
-    ""
-  )
+  let clientEmail = getEnv("GDRIVE_CLIENT_EMAIL")
     .replace(/^["']|["']$/g, "")
     .trim();
-  let rawKey =
-    getEnv("GDRIVE_PRIVATE_KEY") ||
-    getEnv("SERVICE_ACCOUNT_JSON") ||
-    getEnv("GOOGLE_SERVICE_ACCOUNT_JSON") ||
-    getEnv("GDRIVE_SERVICE_ACCOUNT_JSON") ||
-    "";
+  let rawKey = getEnv("GDRIVE_PRIVATE_KEY");
 
   if (rawKey.startsWith("{")) {
     try {
@@ -227,11 +175,7 @@ async function getOrCreateChatsFolder(accessToken: string): Promise<string> {
     return cachedChatsFolderId;
   }
 
-  const mainFolderId =
-    getEnv("GOOGLE_DRIVE_FOLDER_ID") ||
-    getEnv("GDRIVE_MAIN_FOLDER_ID") ||
-    getEnv("GDRIVE_FOLDER_ID") ||
-    DEFAULT_MAIN_FOLDER_ID;
+  const mainFolderId = getEnv("GDRIVE_MAIN_FOLDER_ID") || DEFAULT_MAIN_FOLDER_ID;
 
   // 1. Search for existing 'Chats' folder inside main folder
   const query = `'${mainFolderId}' in parents and name = 'Chats' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
