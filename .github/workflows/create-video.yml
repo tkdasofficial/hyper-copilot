@@ -43,12 +43,19 @@ jobs:
       PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      GOOGLE_CLOUD_API_ID: ${{ secrets.GOOGLE_CLOUD_API_ID }}
-      GOOGLE_CLOUD_API_SECRET: ${{ secrets.GOOGLE_CLOUD_API_SECRET }}
-      GDRIVE_DELEGATED_USER: ${{ secrets.GDRIVE_DELEGATED_USER || 'tusharkantidasofficial@gmail.com' }}
-      GDRIVE_MAIN_FOLDER_ID: ${{ secrets.GDRIVE_MAIN_FOLDER_ID || '1JGjibA287ds3SFoT_Fl2z8cJ96eCDUFs' }}
-      GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
-      GDRIVE_CLIENT_EMAIL: ${{ secrets.GDRIVE_CLIENT_EMAIL }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLOUD_API_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLOUD_API_SECRET }}
+      GOOGLE_CLOUD_API_ID: ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLOUD_API_ID }}
+      GOOGLE_CLOUD_API_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLOUD_API_SECRET }}
+      GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN || secrets.GDRIVE_REFRESH_TOKEN }}
+      GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID || secrets.GDRIVE_MAIN_FOLDER_ID || '1JGjibA287ds3SFoT_Fl2z8cJ96eCDUFs' }}
+      GOOGLE_SERVICE_ACCOUNT_ID: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_ID || secrets.GDRIVE_CLIENT_EMAIL }}
+      GOOGLE_MAIL_REFRESH_TOKEN: ${{ secrets.GOOGLE_MAIL_REFRESH_TOKEN }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN || secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_DELEGATED_USER: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_ID || secrets.GDRIVE_DELEGATED_USER || 'tusharkantidasofficial@gmail.com' }}
+      GDRIVE_MAIN_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID || secrets.GDRIVE_MAIN_FOLDER_ID || '1JGjibA287ds3SFoT_Fl2z8cJ96eCDUFs' }}
+      GDRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID || secrets.GDRIVE_FOLDER_ID }}
+      GDRIVE_CLIENT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_ID || secrets.GDRIVE_CLIENT_EMAIL }}
       GDRIVE_PRIVATE_KEY: ${{ secrets.GDRIVE_PRIVATE_KEY }}
       SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
       GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
@@ -79,12 +86,7 @@ jobs:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 2. Setup Python & Node Runtime Environments
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: 3. Install System & Media Dependencies
+      - name: 2. Setup Build & Media Environment
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
@@ -92,9 +94,9 @@ jobs:
             libavcodec-dev libavformat-dev libavfilter-dev libswscale-dev libswresample-dev libavutil-dev \
             libfreetype-dev libharfbuzz-dev nlohmann-json3-dev libomp-dev fonts-dejavu-core ffmpeg
           sudo fc-cache -fv || true
-          pip install requests edge-tts cryptography
+          pip install edge-tts || true
 
-      - name: 4. Compile C++ Headless Video Engine
+      - name: 3. Compile Strict C++ Native Video Engine & Pipelines
         run: |
           mkdir -p editor/build
           cd editor/build
@@ -102,22 +104,22 @@ jobs:
           make -j$(nproc)
           ./hyper_editor --help || true
 
-      - name: 5. Execute Video Creation Pipeline
+      - name: 4. Execute Strict C++ Video Pipeline
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
             curl -sS -X PATCH "$SUPABASE_URL/rest/v1/videos?id=eq.$VIDEO_ID" \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Content-Type: application/json" \
-              -d '{"status":"processing","step":"Executing Video Pipeline","progress":10}' || true
+              -d '{"status":"processing","step":"Executing C++ Video Engine","progress":10}' || true
           fi
-          python editor/long_form_pipeline.py || node editor/pipeline.js
+          editor/build/hyper_pipeline || editor/build/hyper_long_form
 
-      - name: 6. Export to Storage & Finalize Status
+      - name: 5. Export to Storage & Finalize Status
         if: always()
         run: |
           if [ "${{ job.status }}" = "success" ]; then
-            python editor/export_to_drive.py || true
+            python editor/export_to_drive.py || editor/build/hyper_drive_export || true
             if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
               STATUS_VAL=$(curl -sS "$SUPABASE_URL/rest/v1/videos?id=eq.$VIDEO_ID&select=status" \
                 -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \

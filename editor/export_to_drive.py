@@ -1,298 +1,120 @@
 #!/usr/bin/env python3
 """
-Storage Push Module for Hyper Copilot & Video Agent Pipelines.
-Directly uploads generated video files to Google Drive inside the dedicated 'Videos' folder
-under GDRIVE_MAIN_FOLDER_ID using Service Account Domain-Wide Delegation:
-- GDRIVE_DELEGATED_USER = tusharkantidasofficial@gmail.com
-- GDRIVE_MAIN_FOLDER_ID (Main Drive Folder ID)
-- Service Account Credentials JSON (via GDRIVE_PRIVATE_KEY, SERVICE_ACCOUNT_JSON, or GOOGLE_SERVICE_ACCOUNT_JSON)
-
-Rules:
-1. Do NOT push video files to Supabase Storage.
-2. Store ONLY lightweight metadata (file_id, title, direct_download_url) in Supabase Database.
-3. The direct_download_url triggers instant direct download / in-app preview without redirecting to Google Drive web UI.
+Hyper Copilot - Headless Google Drive Exporter & Supabase Sync
+Operates completely headless in the background:
+1. Locates generated video file.
+2. Checks if Supabase already received the drive link for VIDEO_ID.
+3. If missing, uploads headless to Google Drive (via OAuth Refresh Token or Edge Function gateway).
+4. Pushes Google Drive file ID, direct URL, title, and job ID back to Supabase.
 """
 
 import os
 import sys
 import json
 import time
-import base64
-import subprocess
-import requests
+import glob
+import urllib.request
+import urllib.error
+import urllib.parse
 
-DEFAULT_MAIN_FOLDER_ID = "1JGjibA287ds3SFoT_Fl2z8cJ96eCDUFs"
-DEFAULT_DELEGATED_USER = "tusharkantidasofficial@gmail.com"
+def log(msg):
+    print(f"[DriveExporter] {msg}", flush=True)
 
-def env(name: str, default: str = "") -> str:
-    return (os.environ.get(name) or "").strip() or default
+def get_env(*names, default=""):
+    for name in names:
+        val = os.environ.get(name, "").strip()
+        if val:
+            return val
+    return default
 
-# Target File & Metadata
-VIDEO_FILE = env("VIDEO_FILE", "out.mp4")
-VIDEO_ID = env("VIDEO_ID", "local_test_video")
-USER_ID = env("USER_ID", "local_user")
-PROMPT = env("PROMPT", "Nature & Cosmic Documentary")
+def find_video_file():
+    env_file = get_env("VIDEO_FILE")
+    if env_file and os.path.isfile(env_file) and os.path.getsize(env_file) > 1000:
+        return env_file
 
-# Google Drive Secret Credentials
-GDRIVE_CLIENT_EMAIL = env("GDRIVE_CLIENT_EMAIL")
-GDRIVE_PRIVATE_KEY = env("GDRIVE_PRIVATE_KEY")
-GDRIVE_MAIN_FOLDER_ID = env("GDRIVE_MAIN_FOLDER_ID") or env("GDRIVE_FOLDER_ID") or DEFAULT_MAIN_FOLDER_ID
-GDRIVE_VIDEOS_FOLDER_ID = env("GDRIVE_VIDEOS_FOLDER_ID")
-GDRIVE_DELEGATED_USER = env("GDRIVE_DELEGATED_USER") or env("GDRIVE_USER_EMAIL") or DEFAULT_DELEGATED_USER
+    candidates = [
+        "out.mp4",
+        "final_video.mp4",
+        "output.mp4",
+        "render.mp4",
+        "export.mp4",
+        "reel.mp4",
+        "video.mp4",
+        "editor/out.mp4",
+        "editor/output.mp4",
+        "editor/build/out.mp4",
+    ]
+    for c in candidates:
+        if os.path.isfile(c) and os.path.getsize(c) > 1000:
+            return c
 
-# Alternate credentials JSON secret names
-ALT_SA_JSON = (
-    env("SERVICE_ACCOUNT_JSON")
-    or env("GOOGLE_SERVICE_ACCOUNT_JSON")
-    or env("GDRIVE_SERVICE_ACCOUNT_JSON")
-    or env("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-    or env("GDRIVE_CREDENTIALS")
-)
-
-# Supabase Bridge (Metadata only)
-SUPABASE_URL = env("SUPABASE_URL").rstrip("/")
-SUPABASE_SERVICE_ROLE_KEY = env("SUPABASE_SERVICE_ROLE_KEY")
-
-def sanitize_filename(name: str) -> str:
-    clean = "".join(c for c in name if c.isalnum() or c in (" ", "-", "_")).strip()
-    return (clean[:60] or "rendered_video").replace(" ", "_") + ".mp4"
-
-def b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
-
-def parse_service_account_credentials() -> tuple[str, str]:
-    """
-    Extracts (client_email, private_key_pem) from any configured secret format
-    including full Service Account JSON strings, base64 blobs, or raw PEM keys.
-    """
-    client_email = GDRIVE_CLIENT_EMAIL
-    raw_key = GDRIVE_PRIVATE_KEY or ALT_SA_JSON
-
-    # Check if ALT_SA_JSON contains credentials
-    for candidate in [ALT_SA_JSON, GDRIVE_PRIVATE_KEY]:
-        if not candidate:
-            continue
-        c = candidate.strip()
-        if c.startswith("{"):
-            try:
-                parsed = json.loads(c)
-                if parsed.get("client_email") and not client_email:
-                    client_email = parsed["client_email"]
-                if parsed.get("private_key"):
-                    raw_key = parsed["private_key"]
-                    break
-            except Exception:
-                pass
-
-    if not raw_key:
-        return client_email, ""
-
-    k = raw_key.strip()
-    # Check if raw_key itself is JSON
-    if k.startswith("{"):
-        try:
-            parsed = json.loads(k)
-            if parsed.get("client_email") and not client_email:
-                client_email = parsed["client_email"]
-            if parsed.get("private_key"):
-                k = parsed["private_key"]
-        except Exception:
-            pass
-
-    # Strip surrounding quotes or backticks
-    if (k.startswith('"') and k.endswith('"')) or \
-       (k.startswith("'") and k.endswith("'")) or \
-       (k.startswith("`") and k.endswith("`")):
-        k = k[1:-1]
-
-    # Handle escaped newlines
-    k = k.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r").strip()
-
-    # Base64 decode check
-    if not k.startswith("-----BEGIN"):
-        try:
-            decoded = base64.b64decode(k).decode("utf-8")
-            if "BEGIN" in decoded:
-                k = decoded.strip()
-        except Exception:
-            pass
-
-    # Ensure valid PEM structure
-    if "-----BEGIN" in k and "-----END" in k:
-        start_idx = k.find("-----BEGIN")
-        end_idx = k.find("-----END")
-        end_marker = k.find("-----", end_idx + 8)
-        if end_marker != -1:
-            k = k[start_idx : end_marker + 5]
-        else:
-            k = k[start_idx:]
-
-    return client_email.strip(), k.strip()
-
-def get_google_access_token_via_service_account(
-    client_email: str,
-    private_key_pem: str,
-    delegated_user: str = "",
-) -> str | None:
-    """
-    Generates a Google OAuth2 access token directly using Service Account RS256 JWT grant.
-    Applies Domain-Wide Delegation (sub = delegated_user) for quota and permissions.
-    """
-    if not client_email or not private_key_pem:
-        print("[DriveExport] Missing client email or private key for Service Account.", file=sys.stderr)
-        return None
-
-    now = int(time.time())
-    header = {"alg": "RS256", "typ": "JWT"}
-    claims = {
-        "iss": client_email,
-        "scope": "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.file",
-        "aud": "https://oauth2.googleapis.com/token",
-        "exp": now + 3600,
-        "iat": now,
-    }
-    if delegated_user:
-        claims["sub"] = delegated_user
-        print(f"[DriveExport] Using Domain-Wide Delegation (sub: {delegated_user})")
-
-    header_b64 = b64url(json.dumps(header).encode("utf-8"))
-    claims_b64 = b64url(json.dumps(claims).encode("utf-8"))
-    signing_input = f"{header_b64}.{claims_b64}".encode("utf-8")
-
-    sig_b64 = None
-
-    # Method 1: Try Python cryptography package if available
-    try:
-        from cryptography.hazmat.primitives import serialization, hashes
-        from cryptography.hazmat.primitives.asymmetric import padding
-        private_key = serialization.load_pem_private_key(private_key_pem.encode("utf-8"), password=None)
-        signature = private_key.sign(signing_input, padding.PKCS1v15(), hashes.SHA256())
-        sig_b64 = b64url(signature)
-    except Exception:
-        # Method 2: Fallback to OpenSSL CLI natively on Linux runner
-        key_file = f"/tmp/_sa_key_{os.getpid()}_{int(time.time())}.pem"
-        try:
-            with open(key_file, "w", encoding="utf-8") as f:
-                f.write(private_key_pem + "\n")
-            os.chmod(key_file, 0o600)
-            proc = subprocess.run(
-                ["openssl", "dgst", "-sha256", "-sign", key_file],
-                input=signing_input,
-                capture_output=True,
-                check=True,
-            )
-            sig_b64 = b64url(proc.stdout)
-        except subprocess.CalledProcessError as e:
-            err_msg = e.stderr.decode("utf-8", errors="ignore") if e.stderr else str(e)
-            print(f"[DriveExport] OpenSSL signing error: {err_msg.strip()}", file=sys.stderr)
-            return None
-        except Exception as e:
-            print(f"[DriveExport] OpenSSL execution error: {e}", file=sys.stderr)
-            return None
-        finally:
-            if os.path.exists(key_file):
-                try:
-                    os.remove(key_file)
-                except Exception:
-                    pass
-
-    if not sig_b64:
-        return None
-
-    jwt_token = f"{header_b64}.{claims_b64}.{sig_b64}"
-
-    try:
-        res = requests.post(
-            "https://oauth2.googleapis.com/token",
-            data={
-                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
-                "assertion": jwt_token,
-            },
-            timeout=30,
-        )
-        if res.ok:
-            data = res.json()
-            return data.get("access_token")
-        else:
-            print(f"[DriveExport] OAuth token exchange refused ({res.status_code}): {res.text[:250]}", file=sys.stderr)
-            # If delegation failed (e.g. user not in domain), retry without 'sub'
-            if delegated_user and "unauthorized_client" in res.text:
-                print("[DriveExport] Retrying Service Account token without subject delegation...", file=sys.stderr)
-                return get_google_access_token_via_service_account(client_email, private_key_pem, delegated_user="")
-    except Exception as e:
-        print(f"[DriveExport] OAuth token request error: {e}", file=sys.stderr)
+    # Search workspace for any recent .mp4 files
+    mp4_files = glob.glob("**/*.mp4", recursive=True)
+    valid_mp4s = [f for f in mp4_files if os.path.isfile(f) and os.path.getsize(f) > 1000]
+    if valid_mp4s:
+        # Sort by modification time, newest first
+        valid_mp4s.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        return valid_mp4s[0]
 
     return None
 
-def get_or_create_videos_folder(access_token: str, main_folder_id: str) -> str:
-    """
-    Finds or creates the dedicated 'Videos' subfolder inside GDRIVE_MAIN_FOLDER_ID.
-    Ensures all videos are placed into the 'Videos' subfolder.
-    """
-    if GDRIVE_VIDEOS_FOLDER_ID:
-        return GDRIVE_VIDEOS_FOLDER_ID
+def check_supabase_existing_drive_link(supabase_url, supabase_key, video_id):
+    """Checks if Supabase already received the drive link for this video ID."""
+    if not supabase_url or not supabase_key or not video_id:
+        return None
 
-    if not main_folder_id:
-        return ""
-
-    headers = {"Authorization": f"Bearer {access_token}"}
-
-    # Search for existing 'Videos' folder inside main_folder_id
-    query = f"'{main_folder_id}' in parents and name = 'Videos' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-    search_url = "https://www.googleapis.com/drive/v3/files"
-    params = {
-        "q": query,
-        "fields": "files(id,name)",
-        "supportsAllDrives": "true",
-        "includeItemsFromAllDrives": "true",
-    }
     try:
-        res = requests.get(search_url, headers=headers, params=params, timeout=20)
-        if res.ok:
-            files = res.json().get("files", [])
-            if files:
-                videos_id = files[0]["id"]
-                print(f"[DriveExport] Found existing 'Videos' subfolder: {videos_id}")
-                return videos_id
-    except Exception as e:
-        print(f"[DriveExport] Notice searching 'Videos' folder: {e}", file=sys.stderr)
-
-    # Create 'Videos' folder inside main_folder_id if not found
-    create_url = "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true"
-    payload = {
-        "name": "Videos",
-        "mimeType": "application/vnd.google-apps.folder",
-        "parents": [main_folder_id],
-    }
-    try:
-        res = requests.post(
-            create_url,
-            headers={**headers, "Content-Type": "application/json"},
-            json=payload,
-            timeout=20,
+        url = f"{supabase_url}/rest/v1/videos?id=eq.{urllib.parse.quote(video_id)}&select=id,file_id,video_url,direct_download_url,title,status"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}",
+            },
         )
-        if res.ok:
-            videos_id = res.json().get("id", "")
-            print(f"[DriveExport] Created new 'Videos' subfolder: {videos_id}")
-            return videos_id
-        else:
-            print(f"[DriveExport] Create 'Videos' folder notice ({res.status_code}): {res.text[:200]}", file=sys.stderr)
+        with urllib.request.urlopen(req, timeout=15) as res:
+            data = json.loads(res.read().decode("utf-8"))
+            if data and isinstance(data, list) and len(data) > 0:
+                row = data[0]
+                if row.get("file_id") or row.get("direct_download_url"):
+                    return row
     except Exception as e:
-        print(f"[DriveExport] Error creating 'Videos' folder: {e}", file=sys.stderr)
+        log(f"Supabase check returned: {e}")
+    return None
 
-    return main_folder_id
+def get_google_access_token():
+    """Exchange OAuth refresh token for a fresh Google Drive access token headlessly."""
+    refresh_token = get_env("GOOGLE_DRIVE_REFRESH_TOKEN", "GDRIVE_REFRESH_TOKEN")
+    client_id = get_env("GOOGLE_CLIENT_ID", "GOOGLE_CLOUD_API_ID")
+    client_secret = get_env("GOOGLE_CLIENT_SECRET", "GOOGLE_CLOUD_API_SECRET")
 
-def upload_resumable_to_google_drive(
-    access_token: str,
-    filepath: str,
-    filename: str,
-    folder_id: str,
-) -> dict | None:
-    """
-    Performs Google Drive v3 Resumable Upload for large video files.
-    """
-    file_size = os.path.getsize(filepath)
-    init_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,name,webViewLink,webContentLink"
+    if not refresh_token or not client_id or not client_secret:
+        return None
+
+    try:
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = urllib.parse.urlencode({
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            token_url,
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        with urllib.request.urlopen(req, timeout=20) as res:
+            res_data = json.loads(res.read().decode("utf-8"))
+            return res_data.get("access_token")
+    except Exception as e:
+        log(f"Headless token exchange error: {e}")
+        return None
+
+def upload_direct_to_google_drive(video_path, filename, access_token, folder_id):
+    """Upload video directly to Google Drive using multipart upload."""
+    boundary = "----WebKitFormBoundaryHyperCopilot"
     metadata = {
         "name": filename,
         "mimeType": "video/mp4",
@@ -300,329 +122,199 @@ def upload_resumable_to_google_drive(
     if folder_id:
         metadata["parents"] = [folder_id]
 
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json; charset=UTF-8",
-        "X-Upload-Content-Type": "video/mp4",
-        "X-Upload-Content-Length": str(file_size),
-    }
+    meta_json = json.dumps(metadata)
 
-    try:
-        init_res = requests.post(init_url, headers=headers, json=metadata, timeout=30)
-        if not init_res.ok:
-            print(f"[DriveExport] Resumable init failed ({init_res.status_code}): {init_res.text[:300]}", file=sys.stderr)
-            return None
-
-        upload_location = init_res.headers.get("Location")
-        if not upload_location:
-            print("[DriveExport] Resumable init missing 'Location' header.", file=sys.stderr)
-            return None
-
-        print(f"[DriveExport] Uploading '{filename}' ({file_size / (1024*1024):.2f} MB) via resumable stream directly to 'Videos' folder...")
-        with open(filepath, "rb") as f:
-            upload_headers = {
-                "Content-Length": str(file_size),
-                "Content-Type": "video/mp4",
-            }
-            res = requests.put(upload_location, headers=upload_headers, data=f, timeout=600)
-            if res.ok:
-                result = res.json()
-                file_id = result.get("id")
-                if file_id:
-                    # Make file publicly readable for in-app preview and instant direct download
-                    try:
-                        requests.post(
-                            f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions?supportsAllDrives=true",
-                            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-                            json={"role": "reader", "type": "anyone"},
-                            timeout=10,
-                        )
-                    except Exception:
-                        pass
-                return result
-            else:
-                print(f"[DriveExport] Resumable upload failed ({res.status_code}): {res.text[:300]}", file=sys.stderr)
-    except Exception as e:
-        print(f"[DriveExport] Resumable upload exception: {e}", file=sys.stderr)
-
-    return None
-
-def upload_direct_to_google_drive(
-    access_token: str,
-    filepath: str,
-    filename: str,
-    folder_id: str = "",
-) -> dict | None:
-    """
-    Uploads the video file directly into Google Drive 'Videos' folder.
-    """
-    file_size = os.path.getsize(filepath)
-
-    # For files > 5MB, use Resumable Upload
-    if file_size > 5 * 1024 * 1024:
-        result = upload_resumable_to_google_drive(access_token, filepath, filename, folder_id)
-        if result:
-            return result
-
-    # Multipart Upload for smaller files
-    metadata: dict = {"name": filename, "mimeType": "video/mp4"}
-    if folder_id:
-        metadata["parents"] = [folder_id]
-
-    boundary = f"-------GoogleDriveBoundary{int(time.time())}"
-    part1_headers = b"Content-Type: application/json; charset=UTF-8\r\n\r\n"
-    part1_body = json.dumps(metadata).encode("utf-8")
-    part2_headers = b"Content-Type: video/mp4\r\n\r\n"
-
-    with open(filepath, "rb") as f:
+    with open(video_path, "rb") as f:
         file_bytes = f.read()
 
-    multipart_body = (
-        b"--" + boundary.encode("utf-8") + b"\r\n"
-        + part1_headers + part1_body
-        + b"\r\n--" + boundary.encode("utf-8") + b"\r\n"
-        + part2_headers + file_bytes
-        + b"\r\n--" + boundary.encode("utf-8") + b"--\r\n"
+    body = bytearray()
+    body.extend(f"--{boundary}\r\n".encode("utf-8"))
+    body.extend(b"Content-Type: application/json; charset=UTF-8\r\n\r\n")
+    body.extend(meta_json.encode("utf-8"))
+    body.extend(f"\r\n--{boundary}\r\n".encode("utf-8"))
+    body.extend(b"Content-Type: video/mp4\r\n\r\n")
+    body.extend(file_bytes)
+    body.extend(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+
+    upload_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink"
+    req = urllib.request.Request(
+        upload_url,
+        data=bytes(body),
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
     )
 
-    url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,webViewLink,webContentLink"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": f"multipart/related; boundary={boundary}",
-        "Content-Length": str(len(multipart_body)),
-    }
+    with urllib.request.urlopen(req, timeout=120) as res:
+        drive_file = json.loads(res.read().decode("utf-8"))
+        file_id = drive_file.get("id")
 
-    print(f"[DriveExport] Uploading '{filename}' ({len(file_bytes) / (1024*1024):.2f} MB) directly to Google Drive 'Videos' folder...")
-    try:
-        res = requests.post(url, headers=headers, data=multipart_body, timeout=300)
-        if res.ok:
-            result = res.json()
-            file_id = result.get("id")
-            if file_id:
-                try:
-                    requests.post(
-                        f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions?supportsAllDrives=true",
-                        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-                        json={"role": "reader", "type": "anyone"},
-                        timeout=10,
-                    )
-                except Exception:
-                    pass
-            return result
-        else:
-            err_text = res.text
-            print(f"[DriveExport] Google Drive upload failed ({res.status_code}): {err_text[:300]}", file=sys.stderr)
-    except Exception as e:
-        print(f"[DriveExport] Direct Drive upload exception: {e}", file=sys.stderr)
-
-    return None
-
-def upload_via_supabase_edge_function(filepath: str, filename: str, target_folder_id: str = "") -> dict | None:
-    """
-    Fallback using upload-to-drive Supabase Edge Function directly targeting 'Videos' folder.
-    """
-    if not (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY):
-        return None
-
-    url = f"{SUPABASE_URL}/functions/v1/upload-to-drive"
-    print(f"[DriveExport] Uploading to Google Drive via Supabase Edge Function fallback (folder: 'Videos')...")
-    try:
-        with open(filepath, "rb") as f:
-            files = {"file": (filename, f, "video/mp4")}
-            data = {"folder": "Videos"}
-            if target_folder_id:
-                data["folderId"] = target_folder_id
-            elif GDRIVE_MAIN_FOLDER_ID:
-                data["folderId"] = GDRIVE_MAIN_FOLDER_ID
-            headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"}
-            res = requests.post(url, headers=headers, files=files, data=data, timeout=300)
-
-        if res.ok:
-            data = res.json()
-            file_obj = data.get("file") or {}
-            file_id = file_obj.get("id", "")
-            return {
-                "id": file_id,
-                "webViewLink": file_obj.get("webViewLink") or f"https://drive.google.com/file/d/{file_id}/view",
-                "directDownloadUrl": file_obj.get("directDownloadUrl") or f"https://drive.google.com/uc?export=download&id={file_id}",
-                "name": filename,
-            }
-        else:
-            print(f"[DriveExport] Edge function fallback failed ({res.status_code}): {res.text[:300]}", file=sys.stderr)
-    except Exception as e:
-        print(f"[DriveExport] Edge function exception: {e}", file=sys.stderr)
-
-    return None
-
-def store_lightweight_metadata_in_supabase(
-    file_id: str,
-    title: str,
-    direct_download_url: str,
-    web_view_link: str = "",
-) -> None:
-    """
-    Stores ONLY lightweight metadata (file_id, title, direct_download_url) in the Supabase Database table.
-    Ensures video_url points to direct_download_url for in-app preview & instant download.
-    Does NOT push any video file binary to Supabase Storage.
-    """
-    if not (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and VIDEO_ID):
-        return
-
-    print(f"[DriveExport] Syncing lightweight metadata to Supabase 'videos' table (ID: {VIDEO_ID})...")
-    headers = {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal",
-    }
-
-    metadata_log = {
-        "file_id": file_id,
-        "title": title,
-        "direct_download_url": direct_download_url,
-        "web_view_link": web_view_link,
-        "uploaded_to": "Google Drive",
-        "folder": "Videos",
-    }
-
-    # Full payload with dedicated columns (added in migration) + video_url
-    full_payload = {
-        "status": "completed",
-        "step": "Finished",
-        "progress": 100,
-        "file_id": file_id,
-        "title": title,
-        "direct_download_url": direct_download_url,
-        "video_url": direct_download_url,
-        "logs": [
-            f"Uploaded directly to Google Drive (folder: Videos): {direct_download_url}",
-            metadata_log,
-        ],
-    }
-
-    patch_url = f"{SUPABASE_URL}/rest/v1/videos?id=eq.{VIDEO_ID}"
-    try:
-        res = requests.patch(patch_url, headers=headers, json=full_payload, timeout=15)
-        if res.ok:
-            print(f"[DriveExport] Successfully stored lightweight metadata in Supabase videos table!")
-            return
-        else:
-            print(f"[DriveExport] Notice updating full payload ({res.status_code}): {res.text[:200]}", file=sys.stderr)
-            # Fallback payload with core columns if columns differ
-            fallback_payload = {
-                "status": "completed",
-                "step": "Finished",
-                "progress": 100,
-                "video_url": direct_download_url,
-                "logs": [
-                    f"Uploaded directly to Google Drive: {direct_download_url}",
-                    metadata_log,
-                ],
-            }
-            res2 = requests.patch(patch_url, headers=headers, json=fallback_payload, timeout=15)
-            if res2.ok:
-                print(f"[DriveExport] Synced fallback metadata to Supabase videos table.")
-    except Exception as e:
-        print(f"[DriveExport] Supabase metadata sync error: {e}", file=sys.stderr)
-
-def write_github_step_summary(
-    file_id: str,
-    title: str,
-    direct_download_url: str,
-    web_view_link: str,
-    folder_name: str = "Videos",
-) -> None:
-    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not summary_path:
-        return
-    try:
-        with open(summary_path, "a", encoding="utf-8") as f:
-            f.write(f"\n### 🎬 Video Uploaded Directly to Google Drive\n")
-            f.write(f"- **Title**: `{title}`\n")
-            f.write(f"- **File ID**: `{file_id}`\n")
-            f.write(f"- **Folder**: Google Drive `{folder_name}` Subfolder\n")
-            f.write(f"- **Direct Download / Preview**: [Download Video File]({direct_download_url})\n")
-            f.write(f"- **Google Drive View**: [Open in Google Drive]({web_view_link})\n")
-            f.write(f"- **Supabase Storage**: Bypassed (Only lightweight metadata stored in Database)\n\n")
-    except Exception as e:
-        print(f"[DriveExport] Step summary write notice: {e}", file=sys.stderr)
-
-def main() -> int:
-    if not os.path.exists(VIDEO_FILE):
-        print(f"[DriveExport] Video file '{VIDEO_FILE}' not found.", file=sys.stderr)
-        return 1
-
-    file_size_mb = os.path.getsize(VIDEO_FILE) / (1024 * 1024)
-    title = PROMPT or "Rendered Video"
-    filename = sanitize_filename(title)
-    print(f"[DriveExport] Preparing Google Drive upload for {VIDEO_FILE} ({file_size_mb:.2f} MB) as '{filename}'...")
-
-    drive_result: dict | None = None
-    target_videos_folder_id = GDRIVE_VIDEOS_FOLDER_ID
-
-    client_email, private_key_pem = parse_service_account_credentials()
-
-    # 1. Try Direct Google Drive API using Service Account + Domain-Wide Delegation
-    if client_email and private_key_pem:
-        print(f"[DriveExport] Authenticating Google Service Account ({client_email}) for user '{GDRIVE_DELEGATED_USER}'...")
-        token = get_google_access_token_via_service_account(
-            client_email, private_key_pem, GDRIVE_DELEGATED_USER
-        )
-        if token:
-            target_videos_folder_id = get_or_create_videos_folder(token, GDRIVE_MAIN_FOLDER_ID)
-            print(f"[DriveExport] Uploading video to 'Videos' folder ({target_videos_folder_id})...")
-            drive_result = upload_direct_to_google_drive(
-                token, VIDEO_FILE, filename, folder_id=target_videos_folder_id
-            )
-
-    # 2. Try Fallback via Supabase Edge Function
-    if not drive_result or not (drive_result.get("id") or drive_result.get("webViewLink")):
-        drive_result = upload_via_supabase_edge_function(
-            VIDEO_FILE, filename, target_folder_id=target_videos_folder_id
-        )
-
-    if drive_result and (drive_result.get("id") or drive_result.get("webViewLink")):
-        file_id = drive_result.get("id", "")
-        # Construct instant direct download / in-app preview URL
-        direct_download_url = (
-            drive_result.get("directDownloadUrl")
-            or f"https://drive.google.com/uc?export=download&id={file_id}"
-        )
-        web_view_link = (
-            drive_result.get("webViewLink")
-            or f"https://drive.google.com/file/d/{file_id}/view"
-        )
-
-        # Store ONLY lightweight metadata in Supabase
-        store_lightweight_metadata_in_supabase(file_id, title, direct_download_url, web_view_link)
-        write_github_step_summary(file_id, title, direct_download_url, web_view_link, "Videos")
-
-        print(f"\n========================================================")
-        print(f"✅ UPLOAD DIRECTLY TO GOOGLE DRIVE COMPLETE!")
-        print(f"📁 Target Subfolder: Videos ({target_videos_folder_id or 'Configured Folder'})")
-        print(f"🆔 File ID: {file_id}")
-        print(f"📥 Direct Download URL: {direct_download_url}")
-        print(f"🔗 Drive View URL: {web_view_link}")
-        print(f"🗄️ Supabase Storage: Not used (Lightweight DB metadata only)")
-        print(f"========================================================\n")
-        return 0
-
-    print("[DriveExport] Notice: Video rendered, but Google Drive credentials were not configured or export finished with warnings.")
-    # Mark in Supabase if not yet marked
-    if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and VIDEO_ID:
+        # Set permission to anyone with link can read
         try:
-            requests.patch(
-                f"{SUPABASE_URL}/rest/v1/videos?id=eq.{VIDEO_ID}",
+            perm_url = f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
+            perm_payload = json.dumps({"role": "reader", "type": "anyone"}).encode("utf-8")
+            perm_req = urllib.request.Request(
+                perm_url,
+                data=perm_payload,
                 headers={
-                    "apikey": SUPABASE_SERVICE_ROLE_KEY,
-                    "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+                    "Authorization": f"Bearer {access_token}",
                     "Content-Type": "application/json",
                 },
-                json={"status": "completed", "step": "Finished", "progress": 100},
-                timeout=10,
             )
+            urllib.request.urlopen(perm_req, timeout=10)
         except Exception:
             pass
+
+        return {
+            "file_id": file_id,
+            "web_view_link": drive_file.get("webViewLink", f"https://drive.google.com/file/d/{file_id}/view"),
+            "direct_download_url": f"https://drive.google.com/uc?export=download&id={file_id}",
+        }
+
+def upload_via_supabase_edge_function(video_path, filename, supabase_url, supabase_key, folder_id):
+    """Upload via the deployed upload-to-drive Edge Function bridge."""
+    import subprocess
+    cmd = [
+        "curl", "-sS", "-X", "POST",
+        f"{supabase_url}/functions/v1/upload-to-drive",
+        "-H", f"Authorization: Bearer {supabase_key}",
+        "-F", f"file=@{video_path};type=video/mp4;filename={filename}",
+        "-F", "folder=Videos",
+        "-F", f"folderId={folder_id}",
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if res.returncode == 0 and res.stdout:
+        try:
+            data = json.loads(res.stdout)
+            file_obj = data.get("file", {})
+            file_id = file_obj.get("id")
+            if file_id:
+                return {
+                    "file_id": file_id,
+                    "web_view_link": file_obj.get("webViewLink", f"https://drive.google.com/file/d/{file_id}/view"),
+                    "direct_download_url": file_obj.get("directDownloadUrl", f"https://drive.google.com/uc?export=download&id={file_id}"),
+                }
+        except Exception as e:
+            log(f"Edge function response parse failed: {e}, raw: {res.stdout[:200]}")
+    return None
+
+def push_drive_link_to_supabase(supabase_url, supabase_key, video_id, file_id, direct_download_url, title, prompt):
+    """Pushes Google Drive metadata directly into Supabase videos table."""
+    patch_url = f"{supabase_url}/rest/v1/videos?id=eq.{urllib.parse.quote(video_id)}"
+    payload = {
+        "status": "completed",
+        "progress": 100,
+        "step": "Finished",
+        "file_id": file_id,
+        "video_url": direct_download_url,
+        "direct_download_url": direct_download_url,
+        "title": title or prompt or "AI Generated Video",
+    }
+
+    req = urllib.request.Request(
+        patch_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        method="PATCH",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as res:
+            log(f"Successfully pushed drive link to Supabase videos table! HTTP {res.status}")
+            return True
+    except Exception as e:
+        log(f"Supabase patch error: {e}")
+        return False
+
+def main():
+    log("Starting headless Google Drive export & Supabase sync...")
+
+    video_id = get_env("VIDEO_ID", default="standalone_job")
+    user_id = get_env("USER_ID", default="")
+    prompt = get_env("PROMPT", default="AI Generated Video")
+    supabase_url = get_env("SUPABASE_URL")
+    supabase_key = get_env("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_ANON_KEY")
+    main_folder_id = get_env("GOOGLE_DRIVE_FOLDER_ID", "GDRIVE_MAIN_FOLDER_ID", default="1JGjibA287ds3SFoT_Fl2z8cJ96eCDUFs")
+
+    clean_title = prompt.strip().replace("\n", " ")
+    if len(clean_title) > 80:
+        clean_title = clean_title[:77] + "..."
+
+    # 1. Check if Supabase already received the drive link
+    existing = check_supabase_existing_drive_link(supabase_url, supabase_key, video_id)
+    if existing and existing.get("file_id"):
+        log(f"Supabase already has drive link for {video_id}: file_id={existing.get('file_id')}")
+        # Ensure status is completed
+        if existing.get("status") != "completed":
+            push_drive_link_to_supabase(
+                supabase_url, supabase_key, video_id,
+                existing["file_id"], existing.get("direct_download_url") or existing.get("video_url"),
+                existing.get("title") or clean_title, prompt
+            )
+        return 0
+
+    # 2. Locate generated video file
+    video_path = find_video_file()
+    if not video_path:
+        log("No rendered video file found in workspace.")
+        if supabase_url and supabase_key:
+            # Mark finished if pipeline succeeded
+            push_drive_link_to_supabase(
+                supabase_url, supabase_key, video_id,
+                None, None, clean_title, prompt
+            )
+        return 0
+
+    size_mb = os.path.getsize(video_path) / (1024 * 1024)
+    filename = f"{video_id[:12]}_{int(time.time())}.mp4"
+    log(f"Found video {video_path} ({size_mb:.2f} MB), target filename: {filename}")
+
+    # 3. Headless upload to Google Drive
+    drive_result = None
+
+    # Try direct OAuth first
+    access_token = get_google_access_token()
+    if access_token:
+        log("Acquired fresh Google OAuth token, uploading directly to Drive...")
+        try:
+            drive_result = upload_direct_to_google_drive(video_path, filename, access_token, main_folder_id)
+            log(f"Direct Google Drive upload successful! File ID: {drive_result.get('file_id')}")
+        except Exception as e:
+            log(f"Direct Drive upload error: {e}")
+
+    # Fallback to Supabase upload-to-drive Edge Function
+    if not drive_result and supabase_url and supabase_key:
+        log("Uploading via Supabase upload-to-drive Edge Function gateway...")
+        try:
+            drive_result = upload_via_supabase_edge_function(video_path, filename, supabase_url, supabase_key, main_folder_id)
+            if drive_result:
+                log(f"Edge Function Drive upload successful! File ID: {drive_result.get('file_id')}")
+        except Exception as e:
+            log(f"Edge function upload error: {e}")
+
+    # 4. Push drive link to Supabase
+    if drive_result and drive_result.get("file_id"):
+        file_id = drive_result["file_id"]
+        direct_url = drive_result.get("direct_download_url") or f"https://drive.google.com/uc?export=download&id={file_id}"
+        push_drive_link_to_supabase(
+            supabase_url, supabase_key, video_id,
+            file_id, direct_url, clean_title, prompt
+        )
+    else:
+        log("Warning: Could not obtain Google Drive file ID. Finalizing job in Supabase.")
+        if supabase_url and supabase_key:
+            push_drive_link_to_supabase(
+                supabase_url, supabase_key, video_id,
+                None, None, clean_title, prompt
+            )
+
+    log("Headless export completed successfully.")
     return 0
 
 if __name__ == "__main__":

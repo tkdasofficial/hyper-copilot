@@ -1,5 +1,3 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -115,7 +113,10 @@ async function getGoogleDriveAccessToken(): Promise<string> {
   }
 
   // 1. Check for User OAuth Refresh Token (bypasses Service Account 0 quota restrictions)
-  const refreshToken = getEnv("GOOGLE_REFRESH_TOKEN") || getEnv("GDRIVE_REFRESH_TOKEN");
+  const refreshToken =
+    getEnv("GOOGLE_DRIVE_REFRESH_TOKEN") ||
+    getEnv("GDRIVE_REFRESH_TOKEN") ||
+    getEnv("GOOGLE_REFRESH_TOKEN");
   const clientId =
     getEnv("GOOGLE_CLIENT_ID") || getEnv("GOOGLE_CLOUD_API_ID") || getEnv("GDRIVE_CLIENT_ID");
   const clientSecret =
@@ -158,7 +159,12 @@ async function getGoogleDriveAccessToken(): Promise<string> {
     }
   }
 
-  let clientEmail = (getEnv("GDRIVE_CLIENT_EMAIL") || getEnv("GOOGLE_CLIENT_EMAIL") || "")
+  let clientEmail = (
+    getEnv("GOOGLE_SERVICE_ACCOUNT_ID") ||
+    getEnv("GDRIVE_CLIENT_EMAIL") ||
+    getEnv("GOOGLE_CLIENT_EMAIL") ||
+    ""
+  )
     .replace(/^["']|["']$/g, "")
     .trim();
 
@@ -656,9 +662,15 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
 
   try {
-    const mainFolderId = getEnv("GDRIVE_MAIN_FOLDER_ID") || DEFAULT_MAIN_FOLDER_ID;
+    const mainFolderId =
+      getEnv("GOOGLE_DRIVE_FOLDER_ID") ||
+      getEnv("GDRIVE_MAIN_FOLDER_ID") ||
+      getEnv("GDRIVE_FOLDER_ID") ||
+      DEFAULT_MAIN_FOLDER_ID;
     if (!mainFolderId) {
-      throw new Error("GDRIVE_MAIN_FOLDER_ID is not configured in Supabase secrets.");
+      throw new Error(
+        "GOOGLE_DRIVE_FOLDER_ID or GDRIVE_MAIN_FOLDER_ID is not configured in Supabase secrets.",
+      );
     }
 
     const accessToken = await getGoogleDriveAccessToken();

@@ -128,27 +128,58 @@ async function invokeRenderDispatch(
                   ? "Small"
                   : "Medium";
 
-            const directPayload: Record<string, string> = {
+            // Group all 19+ raw properties into nested JSON objects under 9 top-level keys (<= 10)
+            // to satisfy GitHub Repository Dispatch limit while preserving every property.
+            const directPayload: Record<string, unknown> = {
               video_id: v.id,
-              user_id: v.user_id,
               prompt: v.prompt || "",
-              negative_prompt: v.negative_prompt ?? "",
-              category: v.voice_persona ?? "Documentary",
-              visual_style: v.image_style ?? "Cinematic",
-              resolution: v.quality ?? "1080p",
-              fps: v.bitrate?.includes("30") ? "30" : "60",
-              duration_minutes: String(durMinsVal),
-              duration_seconds: String(durSecVal),
-              voice_gender: v.voice_gender ?? "male",
-              bgm: isBgm ? "true" : "false",
-              captions: v.captions ? "true" : "false",
-              caption_style: v.caption_style ?? "Dynamic",
-              caption_size: captionSize,
-              aspect_ratio: v.aspect_ratio || (isLong ? "16:9" : "9:16"),
-              // Backward compatibility aliases
-              voice_persona: v.voice_persona ?? "Documentary",
-              image_style: v.image_style ?? "Cinematic",
-              caption_scale: String(captionScaleNum),
+              mode: isLong ? "long" : "short",
+              identity: {
+                video_id: v.id,
+                user_id: v.user_id,
+              },
+              content: {
+                prompt: v.prompt || "",
+                negative_prompt: v.negative_prompt ?? "",
+                category: v.voice_persona ?? "Documentary",
+              },
+              visual: {
+                visual_style: v.image_style ?? "Cinematic",
+                image_style: v.image_style ?? "Cinematic",
+                aspect_ratio: v.aspect_ratio || (isLong ? "16:9" : "9:16"),
+                resolution: v.quality ?? "1080p",
+                quality: v.quality ?? "1080p",
+                fps: v.bitrate?.includes("30") ? "30" : "60",
+                bitrate: v.bitrate ?? "standard",
+                motion_template: v.motion_template ?? "dynamic",
+                ken_burns: "true",
+                motion_type: "dynamic",
+                transition_type: "fade",
+                transition_duration: "0.4",
+                color_grading: "true",
+                vignette: "false",
+                subtitle_gradient: "true",
+                progress_bar: isLong ? "false" : "true",
+                progress_bar_color: "white@0.85",
+              },
+              audio: {
+                voice_gender: v.voice_gender ?? "male",
+                voice_persona: v.voice_persona ?? "Documentary",
+                voice_speed: Number(v.voice_speed ?? 1),
+                voice_pitch: Number(v.voice_pitch ?? 0),
+                category: v.voice_persona ?? "Documentary",
+                bgm: isBgm ? "true" : "false",
+              },
+              timing: {
+                duration_seconds: String(durSecVal),
+                duration_minutes: String(durMinsVal),
+              },
+              caption: {
+                captions: v.captions ? "true" : "false",
+                caption_style: v.caption_style ?? "Dynamic",
+                caption_size: captionSize,
+                caption_scale: String(captionScaleNum),
+              },
             };
 
             const ghRes = await fetch(
