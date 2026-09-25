@@ -1,24 +1,38 @@
 /**
  * Server-only generation providers.
  *
- * Pixazo  — Stable Diffusion Inpainting (text-to-image + image-to-image),
- *           Flux 1 Schnell (text-to-image), LTX video (text/image-to-video).
- * Lovable — Gemini image models and Gemini TTS through the AI Gateway.
+ * Pixazo — Stable Diffusion v1-5 (image-to-image), Flux 1 Schnell - FREE (text-to-image),
+ *          LTX 2.5 - FREE (text/image-to-video).
+ * Nvidia  — Flux 1 (Dev) (virtual model generation & content with model via NVIDIA_API_KEY).
+ * Edge TTS — Natural neural speech synthesis.
  */
 
 import { providerSecret } from "@/lib/provider-secrets.server";
 
 const PIXAZO_BASE = "https://gateway.pixazo.ai";
-const LOVABLE_BASE = "https://ai.gateway.lovable.dev/v1";
+const NVIDIA_BASE = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev";
+const NVIDIA_INTEGRATE_BASE = "https://integrate.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev";
+const AI_GATEWAY_BASE =
+  process.env["AI_GATEWAY_URL"] || "https://generativelanguage.googleapis.com";
 
 /** The Pixazo key lives in the Supabase backend vault, not in app env config. */
 async function pixazoKey() {
   return providerSecret("PIXAZO_API_KEY");
 }
 
-function lovableKey() {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) throw new Error("Missing LOVABLE_API_KEY");
+/** The Nvidia key lives in the Supabase backend vault or env. */
+async function nvidiaKey() {
+  try {
+    return await providerSecret("NVIDIA_API_KEY");
+  } catch {
+    const fromEnv = (process.env["NVIDIA_API_KEY"] ?? "").trim();
+    if (fromEnv) return fromEnv;
+    throw new Error("NVIDIA_API_KEY is not configured in Supabase vault or environment.");
+  }
+}
+
+function aiGatewayKey() {
+  const key = process.env["GEMINI_API_KEY"] || process.env["GOOGLE_API_KEY"] || "";
   return key;
 }
 
@@ -268,8 +282,8 @@ export async function pixazoVideoStatus(requestId: string): Promise<VideoJob> {
   };
 }
 
-/** Hyper Image Quality — Gemini image model on the Lovable AI Gateway. */
-export async function lovableGeminiImage(input: {
+/** Hyper Image Quality — Gemini image model. */
+export async function geminiImage(input: {
   prompt: string;
   model?: string | undefined;
   imageUrls?: string[] | undefined;
@@ -278,10 +292,10 @@ export async function lovableGeminiImage(input: {
   for (const url of input.imageUrls ?? []) {
     content.push({ type: "image_url", image_url: { url } });
   }
-  const res = await fetch(`${LOVABLE_BASE}/images/generations`, {
+  const res = await fetch(`${AI_GATEWAY_BASE}/images/generations`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${lovableKey()}`,
+      Authorization: `Bearer ${aiGatewayKey()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -300,16 +314,16 @@ export async function lovableGeminiImage(input: {
   return `data:image/png;base64,${b64}`;
 }
 
-/** Hyper Audio Omni (speech) — Gemini TTS on the Lovable AI Gateway. Returns WAV bytes. */
-export async function lovableSpeech(input: {
+/** Hyper Audio Omni (speech) — Gemini TTS. Returns WAV bytes. */
+export async function geminiSpeech(input: {
   text: string;
   voice?: string | undefined;
   model?: string | undefined;
 }): Promise<{ bytes: Uint8Array; contentType: string }> {
-  const res = await fetch(`${LOVABLE_BASE}/audio/speech`, {
+  const res = await fetch(`${AI_GATEWAY_BASE}/audio/speech`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${lovableKey()}`,
+      Authorization: `Bearer ${aiGatewayKey()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -332,19 +346,17 @@ export async function lovableSpeech(input: {
 }
 
 /**
- * Hyper Audio Omni (music) — text to music on the Lovable AI Gateway.
- * The gateway currently exposes no music model, so this raises a clear,
- * user-facing message instead of an opaque provider error.
+ * Hyper Audio Omni (music) — text to music.
  */
-export async function lovableMusic(input: {
+export async function geminiMusic(input: {
   prompt: string;
   seconds?: number | undefined;
   model?: string | undefined;
 }): Promise<{ bytes: Uint8Array; contentType: string }> {
-  const res = await fetch(`${LOVABLE_BASE}/audio/music`, {
+  const res = await fetch(`${AI_GATEWAY_BASE}/audio/music`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${lovableKey()}`,
+      Authorization: `Bearer ${aiGatewayKey()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -449,3 +461,257 @@ export async function nvidiaNemotronText(input: {
 
   throw lastError ?? new Error("Failed to call Nvidia Nemotron 3 Ultra.");
 }
+
+/** Audio (TTS) Generation — Edge TTS (Natural Neural Voice). Returns MP3 bytes. */
+export async function edgeTtsSpeech(input: {
+  text: string;
+  voice?: string;
+  rate?: string;
+  pitch?: string;
+  volume?: string;
+}): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const voice = input.voice || "en-US-ChristopherNeural";
+  const rate = input.rate || "+0%";
+  const pitch = input.pitch || "+0Hz";
+  const volume = input.volume || "+0%";
+
+  // 1. Try invoking the supabase edge function generate-audio first
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const res = await supabaseAdmin.functions.invoke("generate-audio", {
+      body: {
+        text: input.text,
+        voice,
+        rate,
+        pitch,
+        volume,
+        format: "raw",
+      },
+    });
+
+    if (res.data && !res.error) {
+      if (res.data instanceof Blob) {
+        const buf = new Uint8Array(await res.data.arrayBuffer());
+        if (buf.length > 0) return { bytes: buf, contentType: "audio/mpeg" };
+      }
+      if (res.data instanceof ArrayBuffer) {
+        const buf = new Uint8Array(res.data);
+        if (buf.length > 0) return { bytes: buf, contentType: "audio/mpeg" };
+      }
+    }
+  } catch (_err) {
+    // Fall back to direct Edge TTS WebSocket
+  }
+
+  // 2. Direct synthesis using Edge TTS WebSocket
+  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+  <voice name='${voice}'>
+    <prosody pitch='${pitch}' rate='${rate}' volume='${volume}'>
+      ${input.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+    </prosody>
+  </voice>
+</speak>`;
+
+  const EDGE_TTS_URL =
+    "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4";
+
+  const audioBytes = await new Promise<Uint8Array>((resolve, reject) => {
+    try {
+      const ws = new WebSocket(EDGE_TTS_URL);
+      const audioChunks: Uint8Array[] = [];
+      const requestId = crypto.randomUUID().replace(/-/g, "");
+      const dateStr = new Date().toUTCString();
+
+      const timeout = setTimeout(() => {
+        ws.close();
+        if (audioChunks.length > 0) {
+          let totalLength = 0;
+          for (const chunk of audioChunks) totalLength += chunk.byteLength;
+          const merged = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const chunk of audioChunks) {
+            merged.set(chunk, offset);
+            offset += chunk.byteLength;
+          }
+          resolve(merged);
+        } else {
+          reject(new Error("Edge-TTS synthesis timed out."));
+        }
+      }, 15000);
+
+      ws.binaryType = "arraybuffer";
+
+      ws.onopen = () => {
+        const configMsg =
+          `X-Timestamp:${dateStr}\r\n` +
+          `Content-Type:application/json; charset=utf-8\r\n` +
+          `Path:speech.config\r\n\r\n` +
+          JSON.stringify({
+            context: {
+              synthesis: {
+                audio: {
+                  metadataoptions: {
+                    sentenceBoundaryEnabled: "false",
+                    wordBoundaryEnabled: "false",
+                  },
+                  outputFormat: "audio-24khz-48kbitrate-mono-mp3",
+                },
+              },
+            },
+          });
+        ws.send(configMsg);
+
+        const ssmlMsg =
+          `X-RequestId:${requestId}\r\n` +
+          `Content-Type:application/ssml+xml\r\n` +
+          `X-Timestamp:${dateStr}Z\r\n` +
+          `Path:ssml\r\n\r\n` +
+          ssml;
+        ws.send(ssmlMsg);
+      };
+
+      ws.onmessage = (event) => {
+        if (typeof event.data === "string") {
+          if (event.data.includes("Path:turn.end")) {
+            clearTimeout(timeout);
+            ws.close();
+            let totalLength = 0;
+            for (const chunk of audioChunks) totalLength += chunk.byteLength;
+            const merged = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of audioChunks) {
+              merged.set(chunk, offset);
+              offset += chunk.byteLength;
+            }
+            resolve(merged);
+          }
+        } else if (event.data instanceof ArrayBuffer) {
+          const buf = new Uint8Array(event.data);
+          if (buf.byteLength >= 2) {
+            const headerLen = (buf[0] << 8) | buf[1];
+            const audioOffset = 2 + headerLen;
+            if (buf.byteLength > audioOffset) {
+              audioChunks.push(buf.slice(audioOffset));
+            }
+          }
+        }
+      };
+
+      ws.onerror = (err) => {
+        clearTimeout(timeout);
+        reject(new Error(`WebSocket error connecting to Edge-TTS: ${err}`));
+      };
+
+      ws.onclose = () => {
+        clearTimeout(timeout);
+        if (audioChunks.length > 0) {
+          let totalLength = 0;
+          for (const chunk of audioChunks) totalLength += chunk.byteLength;
+          const merged = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const chunk of audioChunks) {
+            merged.set(chunk, offset);
+            offset += chunk.byteLength;
+          }
+          resolve(merged);
+        }
+      };
+    } catch (wsErr) {
+      reject(wsErr);
+    }
+  });
+
+  return { bytes: audioBytes, contentType: "audio/mpeg" };
+}
+
+/**
+ * Virtual Model Generation — Flux 1 (Dev) via Nvidia API key (NVIDIA_API_KEY).
+ * Runs on Nvidia NIM microservices:
+ * 1. Generate Model (creating character profile views)
+ * 2. Generate Content with Model (rendering character scenes)
+ */
+export async function nvidiaFluxDev(input: {
+  prompt: string;
+  width?: number;
+  height?: number;
+  seed?: number;
+  steps?: number;
+  guidance?: number;
+  imageUrl?: string;
+  mode?: "base" | "canny" | "depth";
+}): Promise<string> {
+  const apiKey = await nvidiaKey();
+
+  const endpoints = [NVIDIA_BASE, NVIDIA_INTEGRATE_BASE];
+
+  const payload: Record<string, unknown> = {
+    prompt: input.prompt,
+    mode: input.imageUrl ? (input.mode ?? "canny") : "base",
+    width: input.width ?? 1024,
+    height: input.height ?? 1024,
+    steps: Math.min(50, Math.max(20, input.steps ?? 30)),
+    cfg_scale: input.guidance ?? 3.5,
+    samples: 1,
+  };
+  if (input.imageUrl) {
+    payload.image = input.imageUrl;
+  }
+  if (input.seed !== undefined) {
+    payload.seed = input.seed;
+  }
+
+  let lastError: Error | null = null;
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Nvidia Flux 1 (Dev) error [${res.status}]: ${text.slice(0, 300)}`);
+      }
+
+      const data = (await res.json()) as {
+        artifacts?: Array<{ base64?: string; b64_json?: string }>;
+        data?: Array<{ b64_json?: string }>;
+        image?: string;
+        output?: string;
+      };
+
+      const b64 =
+        data.artifacts?.[0]?.base64 ||
+        data.artifacts?.[0]?.b64_json ||
+        data.data?.[0]?.b64_json ||
+        data.image ||
+        data.output;
+
+      if (!b64) {
+        throw new Error("Nvidia Flux 1 (Dev) returned no image payload.");
+      }
+
+      if (typeof b64 === "string" && (b64.startsWith("http://") || b64.startsWith("https://"))) {
+        return b64;
+      }
+
+      const clean = String(b64).startsWith("data:")
+        ? String(b64)
+        : `data:image/jpeg;base64,${b64}`;
+      return clean;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (!lastError.message.includes("404") && !lastError.message.includes("400")) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError ?? new Error("Failed to generate image with Nvidia Flux 1 (Dev).");
+}
+

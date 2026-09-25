@@ -106,35 +106,77 @@ Deno.serve(async (req: Request) => {
       throw new Error("PIXAZO_API_KEY is not configured in environment or vault.");
     }
 
-    // Call Flux.1 Schnell on Pixazo
-    const steps = Math.min(8, Math.max(4, Number(body.steps) || 8));
-    const payload: Record<string, unknown> = {
-      prompt,
-      num_steps: steps,
-      width: Number(body.width) || width,
-      height: Number(body.height) || height,
-    };
-    if (body.seed !== undefined) payload.seed = Number(body.seed);
+    const refImage = body.imageUrl || body.image_url || (Array.isArray(body.referenceUrls) ? body.referenceUrls[0] : undefined);
+    const isImg2Img = Boolean(refImage) || body.model === "stable-diffusion-v1-5";
 
-    const pixazoRes = await fetch(`${PIXAZO_BASE}/flux-1-schnell/v1/getData`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-        "Ocp-Apim-Subscription-Key": pixazoKey,
-      },
-      body: JSON.stringify(payload),
-    });
+    let imageUrl: string | undefined;
+    let modelName = "flux-1-schnell";
 
-    const resText = await pixazoRes.text();
-    if (!pixazoRes.ok) {
-      throw new Error(`Flux Schnell error [${pixazoRes.status}]: ${resText.slice(0, 300)}`);
+    if (isImg2Img && refImage) {
+      // Image to Image: Stable Diffusion v1-5 on Pixazo
+      modelName = "stable-diffusion-v1-5";
+      const payload: Record<string, unknown> = {
+        prompt,
+        imageUrl: refImage,
+        negative_prompt: body.negativePrompt || body.negative || "blurry, low quality, distorted",
+        width: Number(body.width) || width,
+        height: Number(body.height) || height,
+        num_steps: Math.min(50, Math.max(20, Number(body.steps) || 30)),
+        guidance: Number(body.guidance) || 7.5,
+        strength: body.strength !== undefined ? Number(body.strength) : 0.65,
+      };
+      if (body.seed !== undefined) payload.seed = Number(body.seed);
+
+      const sdRes = await fetch(`${PIXAZO_BASE}/inpainting/v1/getImage`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+          "Ocp-Apim-Subscription-Key": pixazoKey,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const sdText = await sdRes.text();
+      if (!sdRes.ok) {
+        throw new Error(`Stable Diffusion v1.5 error [${sdRes.status}]: ${sdText.slice(0, 300)}`);
+      }
+
+      const sdData = JSON.parse(sdText) as { output?: string; imageUrl?: string };
+      imageUrl = sdData.imageUrl ?? sdData.output;
+    } else {
+      // Text to Image: Flux.1 Schnell - FREE on Pixazo
+      modelName = "flux-1-schnell";
+      const steps = Math.min(8, Math.max(4, Number(body.steps) || 8));
+      const payload: Record<string, unknown> = {
+        prompt,
+        num_steps: steps,
+        width: Number(body.width) || width,
+        height: Number(body.height) || height,
+      };
+      if (body.seed !== undefined) payload.seed = Number(body.seed);
+
+      const pixazoRes = await fetch(`${PIXAZO_BASE}/flux-1-schnell/v1/getData`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+          "Ocp-Apim-Subscription-Key": pixazoKey,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const resText = await pixazoRes.text();
+      if (!pixazoRes.ok) {
+        throw new Error(`Flux Schnell error [${pixazoRes.status}]: ${resText.slice(0, 300)}`);
+      }
+
+      const data = JSON.parse(resText) as { output?: string; imageUrl?: string };
+      imageUrl = data.output ?? data.imageUrl;
     }
 
-    const data = JSON.parse(resText) as { output?: string; imageUrl?: string };
-    const imageUrl = data.output ?? data.imageUrl;
     if (!imageUrl) {
-      throw new Error("Flux Schnell provider returned no image URL");
+      throw new Error(`${modelName} provider returned no image URL`);
     }
 
     // Optional: Return base64 if requested
@@ -152,11 +194,11 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         ok: true,
-        model: "flux-1-schnell",
+        model: modelName,
         url: imageUrl,
         ...(base64 ? { base64 } : {}),
-        width: payload.width,
-        height: payload.height,
+        width,
+        height,
         aspect,
       }),
       {

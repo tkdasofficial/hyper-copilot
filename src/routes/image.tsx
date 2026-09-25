@@ -106,7 +106,7 @@ function ImageStudio() {
           runJob("image", prompt.trim(), {
             prompt: prompt.trim(),
             negativePrompt: negative.trim(),
-            model: referenceUrls.length ? "hyper-image-flash" : "hyper-image-speed",
+            model: referenceUrls.length ? "stable-diffusion-v1-5" : "flux-1-schnell",
             aspect: ratio,
             resolution: res,
             style,
@@ -146,6 +146,13 @@ function ImageStudio() {
               placeholder="text, watermark, extra fingers"
             />
           </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3.5 py-2.5 text-xs">
+          <span className="text-muted-foreground font-medium">Active Engine:</span>
+          <span className="font-semibold text-foreground">
+            {references.length > 0 ? "Stable Diffusion v1.5 (Image To Image)" : "Flux 1 Schnell - FREE (Text To Image)"}
+          </span>
         </div>
 
         <Panel title="Canvas" summary={`${ratio} · ${res}`}>

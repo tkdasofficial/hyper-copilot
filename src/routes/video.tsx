@@ -48,7 +48,7 @@ export const Route = createFileRoute("/video")({
   component: VideoStudio,
 });
 
-const models = ["Hyper Video Omni"] as const;
+const models = ["LTX 2.5 - FREE"] as const;
 const ratios = ["16:9", "9:16", "1:1"] as const;
 const resolutions = VIDEO_RESOLUTIONS;
 const durations = VIDEO_DURATIONS.map((d) => `${d}s`) as unknown as readonly string[];
@@ -230,6 +230,13 @@ function VideoStudio() {
               placeholder="text overlays, watermark, jitter"
             />
           </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3.5 py-2.5 text-xs">
+          <span className="text-muted-foreground font-medium">Active Engine:</span>
+          <span className="font-semibold text-foreground">
+            {frames.start ? "LTX 2.5 - FREE (Image To Video)" : "LTX 2.5 - FREE (Text To Video)"}
+          </span>
         </div>
 
         <Panel title="Model" summary={model}>

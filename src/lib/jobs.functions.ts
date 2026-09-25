@@ -29,16 +29,54 @@ export const enqueueJob = createServerFn({ method: "POST" })
         .eq("id", "default")
         .maybeSingle();
       const token = runner?.worker_token?.trim();
-      if (token) {
-        supabaseAdmin.functions
-          .invoke("handle-job-execution", {
-            body: { jobId: row.id },
-            headers: { "x-worker-secret": token },
-          })
-          .catch((err) => {
-            console.warn("[Jobs] Direct edge function execution error:", err);
-          });
-      }
+
+      // 1. Invoke edge function
+      supabaseAdmin.functions
+        .invoke("handle-job-execution", {
+          body: { jobId: row.id },
+          headers: token ? { "x-worker-secret": token } : {},
+        })
+        .catch((err) => {
+          console.warn("[Jobs] Direct edge function execution error:", err);
+        });
+
+      // 2. Also run in local Node server background immediately
+      import("@/lib/jobs.server")
+        .then(async ({ runJobStep }) => {
+          try {
+            const { data: jobRow } = await supabaseAdmin
+              .from("jobs")
+              .select("*")
+              .eq("id", row.id)
+              .maybeSingle();
+            if (jobRow && (jobRow.status === "queued" || jobRow.status === "running")) {
+              await supabaseAdmin.from("jobs").update({ status: "running" }).eq("id", row.id);
+              const outcome = await runJobStep(jobRow as any);
+              if (outcome.done) {
+                await supabaseAdmin
+                  .from("jobs")
+                  .update({
+                    status: "completed",
+                    result: outcome.result as any,
+                    generation_id: outcome.generationId,
+                    finished_at: new Date().toISOString(),
+                    error: null,
+                  })
+                  .eq("id", row.id);
+              }
+            }
+          } catch (stepErr: any) {
+            await supabaseAdmin
+              .from("jobs")
+              .update({
+                status: "failed",
+                error: stepErr.message || String(stepErr),
+                finished_at: new Date().toISOString(),
+              })
+              .eq("id", row.id);
+          }
+        })
+        .catch(() => {});
     } catch {
       // Non-blocking fallback
     }

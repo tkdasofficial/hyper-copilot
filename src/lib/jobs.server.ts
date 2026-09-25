@@ -93,8 +93,26 @@ export async function runImage(
 
   let storagePath: string;
   try {
-    if (data.model === "hyper-image-quality") {
-      const dataUrl = await providers.lovableGeminiImage({
+    if (refs.length > 0 || data.model === "stable-diffusion-v1-5") {
+      const url = await providers.pixazoStableDiffusion({
+        prompt: finalPrompt,
+        imageUrl: refs[0],
+        width,
+        height,
+        seed: data.seed,
+        negativePrompt: data.negativePrompt,
+        strength: refs[0]
+          ? Number(
+              (
+                0.35 +
+                (1 - Math.max(0, Math.min(100, data.referenceWeight ?? 50)) / 100) * 0.5
+              ).toFixed(2),
+            )
+          : undefined,
+      });
+      storagePath = await storage.uploadFromUrl(storage.GENERATIONS_BUCKET, userId, url);
+    } else if (data.model === "hyper-image-quality") {
+      const dataUrl = await providers.geminiImage({
         prompt: finalPrompt,
         imageUrls: refs,
       });
@@ -105,30 +123,13 @@ export async function runImage(
         bytes,
         contentType,
       );
-    } else if (data.model === "hyper-image-speed") {
+    } else {
+      // Default / Text to Image: Flux 1 Schnell - FREE
       const url = await providers.pixazoFluxSchnell({
         prompt: finalPrompt,
         width,
         height,
         seed: data.seed,
-      });
-      storagePath = await storage.uploadFromUrl(storage.GENERATIONS_BUCKET, userId, url);
-    } else {
-      const url = await providers.pixazoImage({
-        prompt: finalPrompt,
-        width,
-        height,
-        seed: data.seed,
-        negativePrompt: data.negativePrompt,
-        imageUrl: refs[0],
-        strength: refs[0]
-          ? Number(
-              (
-                0.35 +
-                (1 - Math.max(0, Math.min(100, data.referenceWeight ?? 50)) / 100) * 0.5
-              ).toFixed(2),
-            )
-          : undefined,
       });
       storagePath = await storage.uploadFromUrl(storage.GENERATIONS_BUCKET, userId, url);
     }
@@ -282,27 +283,49 @@ export async function runSpeech(
 ) {
   const providers = await import("@/lib/providers.server");
   const storage = await import("@/lib/storage.server");
-  const { styledSpeechText } = await import("@/lib/media.shared");
 
-  const { bytes, contentType } = await providers.lovableSpeech({
-    text: styledSpeechText(data.text, data.tone, data.pace),
-    voice: data.voice,
-    model: data.model,
-  });
+  const pacePercent =
+    data.pace && data.pace !== 100
+      ? `${data.pace > 100 ? "+" : ""}${data.pace - 100}%`
+      : "+0%";
+
+  let bytes: Uint8Array;
+  let contentType: string;
+
+  try {
+    const res = await providers.edgeTtsSpeech({
+      text: data.text,
+      voice: data.voice || "en-US-ChristopherNeural",
+      rate: pacePercent,
+    });
+    bytes = res.bytes;
+    contentType = res.contentType;
+  } catch (ttsErr) {
+    console.warn("[runSpeech] Edge-TTS direct failed, trying fallback:", ttsErr);
+    const { styledSpeechText } = await import("@/lib/media.shared");
+    const fallback = await providers.geminiSpeech({
+      text: styledSpeechText(data.text, data.tone, data.pace),
+      voice: data.voice,
+      model: data.model,
+    });
+    bytes = fallback.bytes;
+    contentType = fallback.contentType;
+  }
+
   const path = await storage.uploadBytes(storage.GENERATIONS_BUCKET, userId, bytes, contentType);
   const { data: row, error } = await supabaseAdmin
     .from("generations")
     .insert({
       user_id: userId,
       kind: "audio",
-      model: "hyper-audio-omni",
+      model: "edge-tts",
       prompt: data.text,
       status: "completed",
       storage_path: path,
       params: {
         mode: "speech",
-        voice: data.voice ?? "Kore",
-        ttsModel: data.model ?? null,
+        voice: data.voice ?? "en-US-ChristopherNeural",
+        ttsModel: "edge-tts",
         tone: data.tone ?? null,
         pace: data.pace ?? null,
       },
@@ -338,7 +361,7 @@ export async function runMusic(
     .join(", ");
 
   try {
-    const { bytes, contentType } = await providers.lovableMusic({
+    const { bytes, contentType } = await providers.geminiMusic({
       prompt: brief,
       seconds: data.seconds,
     });

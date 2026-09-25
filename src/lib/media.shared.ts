@@ -1,23 +1,31 @@
 /** Shared, client-safe option catalogs for the video and audio studios. */
 
 export const TTS_MODELS = [
+  { id: "edge-tts", name: "Edge TTS (Default)", note: "Natural neural speech" },
   { id: "google/gemini-2.5-flash-tts", name: "Hyper Audio Omni", note: "Balanced speech" },
   {
     id: "google/gemini-2.5-pro-tts",
     name: "Hyper Audio Omni Pro",
     note: "Highest fidelity speech",
   },
-  {
-    id: "google/gemini-3.1-flash-tts-preview",
-    name: "Hyper Audio Omni Next",
-    note: "Newest voice engine",
-  },
 ] as const;
 
 export type TtsModelId = (typeof TTS_MODELS)[number]["id"];
 
-/** Prebuilt Gemini TTS voices, grouped by character. */
+/** Edge TTS and Studio Neural voices */
 export const VOICES = [
+  { id: "en-US-ChristopherNeural", label: "Christopher", note: "Conversational · natural male" },
+  { id: "en-US-JennyNeural", label: "Jenny", note: "Friendly · bright female" },
+  { id: "en-US-GuyNeural", label: "Guy", note: "Professional · clear male" },
+  { id: "en-US-AriaNeural", label: "Aria", note: "Expressive · versatile female" },
+  { id: "en-US-EricNeural", label: "Eric", note: "Authentic · relatable male" },
+  { id: "en-US-AnaNeural", label: "Ana", note: "Warm · youthful female" },
+  { id: "en-US-MichelleNeural", label: "Michelle", note: "Clear · narrator female" },
+  { id: "en-GB-SoniaNeural", label: "Sonia (UK)", note: "British · polished female" },
+  { id: "en-GB-RyanNeural", label: "Ryan (UK)", note: "British · crisp male" },
+  { id: "en-AU-NatashaNeural", label: "Natasha (AU)", note: "Australian · cheerful female" },
+  { id: "en-IN-NeerjaNeural", label: "Neerja (IN)", note: "Indian · clear female" },
+  { id: "en-IN-PrabhatNeural", label: "Prabhat (IN)", note: "Indian · confident male" },
   { id: "Kore", label: "Kore", note: "Warm · firm" },
   { id: "Puck", label: "Puck", note: "Bright · upbeat" },
   { id: "Charon", label: "Charon", note: "Deep · informative" },
@@ -26,28 +34,6 @@ export const VOICES = [
   { id: "Leda", label: "Leda", note: "Youthful · light" },
   { id: "Orus", label: "Orus", note: "Confident · firm" },
   { id: "Zephyr", label: "Zephyr", note: "Bright · airy" },
-  { id: "Callirrhoe", label: "Callirrhoe", note: "Easy-going" },
-  { id: "Autonoe", label: "Autonoe", note: "Bright · clear" },
-  { id: "Enceladus", label: "Enceladus", note: "Breathy · soft" },
-  { id: "Iapetus", label: "Iapetus", note: "Clear · neutral" },
-  { id: "Umbriel", label: "Umbriel", note: "Easy · mellow" },
-  { id: "Algieba", label: "Algieba", note: "Smooth" },
-  { id: "Despina", label: "Despina", note: "Smooth · friendly" },
-  { id: "Erinome", label: "Erinome", note: "Clear · crisp" },
-  { id: "Algenib", label: "Algenib", note: "Gravelly" },
-  { id: "Rasalgethi", label: "Rasalgethi", note: "Informative" },
-  { id: "Laomedeia", label: "Laomedeia", note: "Upbeat" },
-  { id: "Achernar", label: "Achernar", note: "Soft" },
-  { id: "Alnilam", label: "Alnilam", note: "Firm" },
-  { id: "Schedar", label: "Schedar", note: "Even · steady" },
-  { id: "Gacrux", label: "Gacrux", note: "Mature" },
-  { id: "Pulcherrima", label: "Pulcherrima", note: "Forward" },
-  { id: "Achird", label: "Achird", note: "Friendly" },
-  { id: "Zubenelgenubi", label: "Zubenelgenubi", note: "Casual" },
-  { id: "Vindemiatrix", label: "Vindemiatrix", note: "Gentle" },
-  { id: "Sadachbia", label: "Sadachbia", note: "Lively" },
-  { id: "Sadaltager", label: "Sadaltager", note: "Knowledgeable" },
-  { id: "Sulafat", label: "Sulafat", note: "Warm" },
 ] as const;
 
 export type VoiceId = (typeof VOICES)[number]["id"];

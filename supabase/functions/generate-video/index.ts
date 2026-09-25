@@ -161,7 +161,10 @@ Deno.serve(async (req: Request) => {
     const frames = Number(body.frames) || 121;
     const frameRate = Number(body.frameRate || body.frame_rate) || 24;
 
-    const path = imageUrl ? "/ltx-video/v1/image-to-video" : "/ltx-video/v1/text-to-video";
+    const endpoints = imageUrl
+      ? ["/ltx-2-5-free/v1/image-to-video", "/ltx-video/v1/image-to-video"]
+      : ["/ltx-2-5-free/v1/text-to-video", "/ltx-video/v1/text-to-video"];
+
     const apiPayload: Record<string, unknown> = {
       prompt,
       ...(imageUrl ? { image_url: imageUrl } : {}),
@@ -177,33 +180,45 @@ Deno.serve(async (req: Request) => {
 
     if (!pixazoKey) throw new Error("PIXAZO_API_KEY is not configured.");
 
-    const pixazoRes = await fetch(`${PIXAZO_BASE}${path}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-        "Ocp-Apim-Subscription-Key": pixazoKey,
-      },
-      body: JSON.stringify(apiPayload),
-    });
+    let lastError: Error | null = null;
+    let requestId: string | undefined;
 
-    const resText = await pixazoRes.text();
-    if (!pixazoRes.ok) {
-      throw new Error(
-        `Video generation request failed [${pixazoRes.status}]: ${resText.slice(0, 300)}`,
-      );
+    for (const path of endpoints) {
+      try {
+        const pixazoRes = await fetch(`${PIXAZO_BASE}${path}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            "Ocp-Apim-Subscription-Key": pixazoKey,
+          },
+          body: JSON.stringify(apiPayload),
+        });
+
+        const resText = await pixazoRes.text();
+        if (!pixazoRes.ok) {
+          throw new Error(
+            `Video generation failed [${pixazoRes.status}]: ${resText.slice(0, 300)}`,
+          );
+        }
+
+        const resData = JSON.parse(resText) as { request_id?: string; requestId?: string };
+        requestId = resData.request_id ?? resData.requestId;
+        if (requestId) break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
     }
 
-    const resData = JSON.parse(resText) as { request_id?: string };
-    if (!resData.request_id) {
-      throw new Error("Video provider did not return a valid request_id.");
+    if (!requestId) {
+      throw lastError ?? new Error("Video provider did not return a valid request_id.");
     }
 
     return new Response(
       JSON.stringify({
         ok: true,
-        model: "ltx-video-5s",
-        requestId: resData.request_id,
+        model: "ltx-2.5-free",
+        requestId,
         status: "PROCESSING",
         duration: "5s",
         frames,

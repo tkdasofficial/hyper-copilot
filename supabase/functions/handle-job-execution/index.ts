@@ -40,6 +40,99 @@ interface JobToProcess {
   [key: string]: unknown;
 }
 
+async function callNvidiaFluxDev(
+  supabase: any,
+  prompt: string,
+  imageUrl?: string,
+  seed?: number,
+): Promise<string> {
+  let nvidiaKey = Deno.env.get("NVIDIA_API_KEY") ?? "";
+  if (!nvidiaKey) {
+    const { data } = await supabase.rpc("get_provider_secret", { p_name: "NVIDIA_API_KEY" });
+    if (typeof data === "string" && data.trim()) nvidiaKey = data.trim();
+  }
+  if (!nvidiaKey) throw new Error("NVIDIA_API_KEY is not configured in environment or vault.");
+
+  const endpoints = [
+    "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev",
+    "https://integrate.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev",
+  ];
+
+  const payload: Record<string, unknown> = {
+    prompt,
+    mode: imageUrl ? "canny" : "base",
+    width: 1024,
+    height: 1024,
+    steps: 30,
+    cfg_scale: 3.5,
+    samples: 1,
+    ...(imageUrl ? { image: imageUrl } : {}),
+    ...(seed !== undefined ? { seed } : {}),
+  };
+
+  let lastErr: Error | null = null;
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${nvidiaKey}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Nvidia Flux 1 (Dev) error [${res.status}]: ${text.slice(0, 300)}`);
+      }
+      const data = await res.json();
+      const b64 =
+        data.artifacts?.[0]?.base64 ||
+        data.artifacts?.[0]?.b64_json ||
+        data.data?.[0]?.b64_json ||
+        data.image ||
+        data.output;
+      if (!b64) throw new Error("Nvidia Flux 1 (Dev) returned no image.");
+      if (typeof b64 === "string" && (b64.startsWith("http://") || b64.startsWith("https://"))) {
+        return b64;
+      }
+      return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+  throw lastErr ?? new Error("Failed to call Nvidia Flux 1 (Dev).");
+}
+
+async function uploadDataUrlToStorage(
+  supabase: any,
+  bucket: string,
+  userId: string,
+  dataUrlOrHttp: string,
+): Promise<string> {
+  let bytes: Uint8Array;
+  let contentType = "image/jpeg";
+  if (dataUrlOrHttp.startsWith("data:")) {
+    const match = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrlOrHttp);
+    contentType = match?.[1] || "image/jpeg";
+    const binary = atob(match?.[2] || "");
+    bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  } else {
+    const res = await fetch(dataUrlOrHttp);
+    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+    contentType = res.headers.get("content-type") || "image/jpeg";
+    bytes = new Uint8Array(await res.arrayBuffer());
+  }
+
+  const fileName = `${userId}/${crypto.randomUUID()}.${contentType.includes("png") ? "png" : "jpg"}`;
+  const { error } = await supabase.storage.from(bucket).upload(fileName, bytes, { contentType });
+  if (error) throw new Error(`Failed to upload to storage: ${error.message}`);
+  const { data: signed } = await supabase.storage.from(bucket).createSignedUrl(fileName, 60 * 60 * 24);
+  return signed?.signedUrl ?? fileName;
+}
+
 /**
  * Enterprise Job Execution Handler for asynchronous studio operations
  * Claims leased background tasks (image/video/model tasks), delegates generation to
@@ -107,8 +200,9 @@ export async function handleJobExecution(options?: {
 
       let resultUrl: string | undefined;
 
-      // 1. Image Job -> call generate-image Edge Function
+      // 1. Image Job (Flux 1 Schnell - FREE or Stable Diffusion v1-5 for img2img)
       if (kind === "image") {
+        const refUrl = input.imageUrl || (Array.isArray(input.referenceUrls) ? input.referenceUrls[0] : undefined);
         const genRes = await fetch(`${supabaseUrl}/functions/v1/generate-image`, {
           method: "POST",
           headers: {
@@ -117,6 +211,8 @@ export async function handleJobExecution(options?: {
           },
           body: JSON.stringify({
             prompt: input.prompt,
+            imageUrl: refUrl,
+            model: refUrl ? "stable-diffusion-v1-5" : (input.model || "flux-1-schnell"),
             aspect: input.aspect,
             resolution: input.resolution,
             steps: input.steps,
@@ -129,7 +225,7 @@ export async function handleJobExecution(options?: {
         }
         resultUrl = genJson.url;
       }
-      // 2. Video Clip Job -> call generate-video Edge Function
+      // 2. Video Clip Job (LTX 2.5 - FREE)
       else if (kind === "video") {
         const vidRes = await fetch(`${supabaseUrl}/functions/v1/generate-video`, {
           method: "POST",
@@ -145,8 +241,8 @@ export async function handleJobExecution(options?: {
         }
         resultUrl = vidJson.url;
       }
-      // 3. Audio Job -> call generate-audio Edge Function
-      else if (kind === "audio") {
+      // 3. Audio (TTS) Job (Edge TTS)
+      else if (kind === "audio" || kind === "speech") {
         const audRes = await fetch(`${supabaseUrl}/functions/v1/generate-audio`, {
           method: "POST",
           headers: {
@@ -154,8 +250,8 @@ export async function handleJobExecution(options?: {
             Authorization: `Bearer ${supabaseServiceKey}`,
           },
           body: JSON.stringify({
-            text: input.text,
-            voice: input.voice,
+            text: input.text || input.prompt,
+            voice: input.voice || "en-US-ChristopherNeural",
             format: "link",
             userId: job.user_id,
           }),
@@ -165,6 +261,75 @@ export async function handleJobExecution(options?: {
           throw new Error(audJson.error || "Audio generation failed");
         }
         resultUrl = audJson.url;
+      }
+      // 4. Virtual Model Generation — Generate Model via Nvidia Flux 1 (Dev)
+      else if (kind === "virtual-model") {
+        const modelName = String(input.name || "New Model");
+        const identityPrompt = String(input.identityPrompt || input.prompt || "");
+        const seed = Number(input.seed) || Math.floor(Math.random() * 1000000);
+
+        // Generate headshot with Flux 1 (Dev) via NVIDIA NIM
+        const imgData = await callNvidiaFluxDev(
+          supabase,
+          `close-up headshot portrait of ${identityPrompt}, facing camera, neutral studio background, photorealistic, 8k, tack sharp`,
+          undefined,
+          seed,
+        );
+
+        const storageUrl = await uploadDataUrlToStorage(
+          supabase,
+          "virtual-models",
+          String(job.user_id || "public"),
+          imgData,
+        );
+
+        // Create or update virtual model row
+        const { data: vmRow, error: vmErr } = await supabase
+          .from("virtual_models")
+          .insert({
+            user_id: job.user_id,
+            name: modelName,
+            description: String(input.description || "Flux 1 (Dev) Virtual Model"),
+            identity_prompt: identityPrompt,
+            seed,
+            status: "ready",
+            headshot_path: storageUrl,
+            images: [{ view: "headshot", path: storageUrl }],
+          })
+          .select("id")
+          .single();
+
+        if (vmErr) throw new Error(vmErr.message);
+        resultUrl = storageUrl;
+      }
+      // 5. Virtual Model Generation — Generate Content with Model via Nvidia Flux 1 (Dev)
+      else if (kind === "character-image") {
+        const prompt = String(input.prompt || "Model portrait photoshoot");
+        let refHeadshot: string | undefined = undefined;
+
+        if (input.modelId) {
+          const { data: vm } = await supabase
+            .from("virtual_models")
+            .select("headshot_path, identity_prompt")
+            .eq("id", input.modelId)
+            .maybeSingle();
+          if (vm?.headshot_path) refHeadshot = vm.headshot_path;
+        }
+
+        const imgData = await callNvidiaFluxDev(
+          supabase,
+          prompt,
+          refHeadshot,
+          input.seed ? Number(input.seed) : undefined,
+        );
+
+        const storageUrl = await uploadDataUrlToStorage(
+          supabase,
+          "generations",
+          String(job.user_id || "public"),
+          imgData,
+        );
+        resultUrl = storageUrl;
       }
 
       // Record generation entry in user's library

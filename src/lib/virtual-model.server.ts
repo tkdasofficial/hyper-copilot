@@ -1,7 +1,7 @@
 /** Server-only character generation pipeline. */
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { lovableGeminiImage, pixazoImage, sizeForAspect } from "@/lib/providers.server";
+import { geminiImage, nvidiaFluxDev, pixazoImage, sizeForAspect } from "@/lib/providers.server";
 import {
   GENERATIONS_BUCKET,
   MODELS_BUCKET,
@@ -205,12 +205,8 @@ export async function buildCharacterProfile(
 /**
  * Renders an image that must keep a character's identity.
  *
- * The Pixazo inpainting endpoint ignores the prompt when it is handed a source
- * image — it simply returns the reference photo re-framed, which is why every
- * "full body" render came back as the profile picture. Reference-conditioned
- * renders therefore go to the gateway image model, which actually edits the
- * reference (new pose, wardrobe, scene, framing) while holding the face. The
- * Pixazo path stays as a fallback so a gateway outage still produces an image.
+ * Runs via Nvidia API key (NVIDIA_API_KEY) with Flux 1 (Dev) NIM microservice.
+ * Supports reference conditioning for pose, framing, wardrobe and face consistency.
  */
 async function identityRender(input: {
   prompt: string;
@@ -224,10 +220,28 @@ async function identityRender(input: {
   steps: number;
   guidance: number;
 }): Promise<string> {
+  const inlined = input.reference ? await inlineReference(input.reference) : undefined;
+
+  // 1. Primary: Flux 1 (Dev) via Nvidia API key (NVIDIA_API_KEY)
+  try {
+    return await nvidiaFluxDev({
+      prompt: input.prompt,
+      imageUrl: inlined,
+      mode: inlined ? "canny" : "base",
+      width: input.width,
+      height: input.height,
+      seed: input.seed,
+      steps: input.steps,
+      guidance: input.guidance,
+    });
+  } catch (nvidiaErr) {
+    console.warn("[virtual-model] Nvidia Flux 1 (Dev) call failed, trying fallback:", nvidiaErr);
+  }
+
+  // 2. Fallbacks
   if (input.reference) {
-    const inlined = await inlineReference(input.reference);
     try {
-      return await lovableGeminiImage({
+      return await geminiImage({
         prompt: [
           input.prompt,
           `output image aspect ratio ${input.aspect}, roughly ${input.width}x${input.height} pixels`,
@@ -236,7 +250,7 @@ async function identityRender(input: {
         ]
           .filter(Boolean)
           .join("\n\n"),
-        imageUrls: [inlined],
+        imageUrls: inlined ? [inlined] : [],
       });
     } catch {
       return pixazoImage({
@@ -372,7 +386,7 @@ export async function renderCharacterImage(
     .insert({
       user_id: userId,
       kind: "image",
-      model: "hyper-image-flash",
+      model: "flux-1-dev",
       prompt: input.prompt,
       status: "completed",
       storage_path: path,
