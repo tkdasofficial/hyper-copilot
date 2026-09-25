@@ -148,13 +148,6 @@ function ImageStudio() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3.5 py-2.5 text-xs">
-          <span className="text-muted-foreground font-medium">Active Engine:</span>
-          <span className="font-semibold text-foreground">
-            {references.length > 0 ? "Stable Diffusion v1.5 (Image To Image)" : "Flux 1 Schnell - FREE (Text To Image)"}
-          </span>
-        </div>
-
         <Panel title="Canvas" summary={`${ratio} · ${res}`}>
           <RatioBlocks label="Aspect ratio" options={ratios} value={ratio} onChange={setRatio} />
           <Segment label="Resolution" options={resolutions} value={res} onChange={setRes} />

@@ -21,3 +21,5 @@
 - Add Video Agent sidebar entry with custom icon
 - Build Video Agent page with prompt, voice, motion, captions, render settings, timeline, console
 - Add Video Agent to mobile drawer menu
+
+- [x] Remove visible engine tags from every feature page

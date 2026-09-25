@@ -123,11 +123,6 @@ function CreateModel() {
   return (
     <StudioLayout>
       <div className="space-y-3.5">
-        <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3.5 py-2.5 text-xs">
-          <span className="text-muted-foreground font-medium">Model Engine:</span>
-          <span className="font-semibold text-foreground">Flux 1 (Dev) · Nvidia NIM</span>
-        </div>
-
         <div className="rounded-2xl border border-border bg-surface/50 p-3.5">
           <TextRow
             label="Model name"

@@ -126,13 +126,6 @@ function AudioStudio() {
           <Segment options={modes} value={mode} onChange={setMode} />
         </Panel>
 
-        <div className="flex items-center justify-between rounded-xl border border-border bg-surface/40 px-3.5 py-2.5 text-xs">
-          <span className="text-muted-foreground font-medium">Engine:</span>
-          <span className="font-semibold text-foreground">
-            {mode === "Text to speech" ? "Edge TTS (Natural Neural Speech)" : "Lyria Music Synthesis"}
-          </span>
-        </div>
-
         <div className="rounded-2xl border border-border bg-surface/50 p-3.5">
           <TextRow
             label={mode === "Text to speech" ? "Script" : "Music brief"}
